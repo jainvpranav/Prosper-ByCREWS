@@ -1,12 +1,12 @@
-# Requirements Document: Prosper - Preventive Healthcare Mobile App
+# Requirements Document: Prosper - Preventive Healthcare Web Application
 
 ## Introduction
 
-Prosper is a preventive healthcare mobile application designed to empower users with personalized health screening recommendations and cancer awareness information. The application focuses on lifestyle diseases (cardiovascular, liver, and metabolic disorders) and cancer screening awareness, providing evidence-based guidance without offering clinical diagnosis or medical decision-making.
+Prosper is a preventive healthcare web application designed to empower users with personalized health screening recommendations and cancer awareness information. The application focuses on lifestyle diseases (cardiovascular, liver, and metabolic disorders) and cancer screening awareness, providing evidence-based guidance without offering clinical diagnosis or medical decision-making.
 
-The app leverages publicly validated medical screening guidelines and responsible AI principles to deliver personalized recommendations based on user demographics (age, gender, region) and lifestyle factors. It includes an intelligent RAG-based chatbot trained on public health sources, appointment booking capabilities, and reminder systems to help users stay proactive about their health.
+The web app leverages publicly validated medical screening guidelines and responsible AI principles to deliver personalized recommendations based on user demographics (age, gender, region) and lifestyle factors. It includes an intelligent RAG-based chatbot trained on public health sources, appointment booking capabilities, and reminder systems to help users stay proactive about their health.
 
-Prosper is built with privacy, transparency, and ethical AI practices at its core, using only synthetic or publicly available data to ensure user safety and regulatory compliance.
+Prosper is built on AWS cloud infrastructure with privacy, transparency, and ethical AI practices at its core, using only synthetic or publicly available data to ensure user safety and regulatory compliance. The web-based platform ensures accessibility across devices without requiring app installation.
 
 ## Problem Statement
 
@@ -17,8 +17,9 @@ Lifestyle diseases and cancer are leading causes of mortality worldwide, yet man
 - Difficulty in tracking and remembering health checkup schedules
 - Fragmented information from multiple health sources
 - Barriers to booking and managing healthcare appointments
+- Need for accessible web-based solutions that work across all devices
 
-Prosper addresses these gaps by providing a centralized, AI-powered platform that delivers personalized, evidence-based health screening recommendations while maintaining strict ethical and compliance standards.
+Prosper addresses these gaps by providing a centralized, cloud-based, AI-powered web platform that delivers personalized, evidence-based health screening recommendations while maintaining strict ethical and compliance standards.
 
 ## Objectives
 
@@ -28,7 +29,8 @@ Prosper addresses these gaps by providing a centralized, AI-powered platform tha
 4. Offer accessible, reliable health information through an AI-powered chatbot
 5. Facilitate seamless hospital appointment booking and reminder management
 6. Ensure responsible AI implementation with transparency, privacy, and ethical considerations
-7. Deliver a user-friendly mobile experience suitable for diverse user demographics
+7. Deliver a responsive, user-friendly web experience accessible across all devices and browsers
+8. Leverage AWS cloud infrastructure for scalability, reliability, and security
 
 ## Requirements
 
@@ -166,18 +168,19 @@ Prosper addresses these gaps by providing a centralized, AI-powered platform tha
 
 ### Requirement 10: User Interface and Accessibility
 
-**User Story:** As a user, I want an intuitive and accessible mobile interface, so that I can easily navigate the app regardless of my technical proficiency or abilities.
+**User Story:** As a user, I want an intuitive and accessible web interface, so that I can easily navigate the app regardless of my technical proficiency, device, or abilities.
 
 #### Acceptance Criteria
 
-1. WHEN a user opens the app THEN the system SHALL display a clear dashboard with key features accessible within 2 taps
-2. WHEN navigating the app THEN the system SHALL provide consistent navigation patterns across all screens
+1. WHEN a user opens the web app THEN the system SHALL display a clear dashboard with key features accessible within 2 clicks
+2. WHEN navigating the app THEN the system SHALL provide consistent navigation patterns across all pages
 3. WHEN displaying text content THEN the system SHALL support adjustable font sizes for readability
 4. IF a user has visual impairments THEN the system SHALL be compatible with screen readers
 5. WHEN showing health information THEN the system SHALL use clear, jargon-free language with medical terms explained
 6. WHEN the app is used in different regions THEN the system SHALL support multiple languages
 7. WHEN displaying colors THEN the system SHALL ensure sufficient contrast ratios for accessibility (WCAG 2.1 AA standards)
-8. IF a user has limited connectivity THEN the system SHALL provide offline access to previously loaded recommendations and content
+8. WHEN accessed from different devices THEN the system SHALL provide responsive design for desktop, tablet, and mobile browsers
+9. IF a user has limited connectivity THEN the system SHALL optimize page load times and provide progressive loading
 
 ## Non-Functional Requirements
 
@@ -203,9 +206,10 @@ Prosper addresses these gaps by providing a centralized, AI-powered platform tha
 
 ### Compatibility
 
-1. WHEN deployed THEN the system SHALL support iOS 14+ and Android 10+ devices
+1. WHEN deployed THEN the system SHALL support modern web browsers (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 2. WHEN running on different devices THEN the system SHALL adapt UI to various screen sizes (responsive design)
 3. WHEN integrating with external services THEN the system SHALL use standard APIs and protocols
+4. WHEN accessed from mobile browsers THEN the system SHALL provide touch-optimized interactions
 
 ### Maintainability
 
@@ -252,12 +256,13 @@ Prosper addresses these gaps by providing a centralized, AI-powered platform tha
 
 ### Assumptions
 
-1. Users have access to smartphones with iOS 14+ or Android 10+ operating systems
-2. Users have internet connectivity for initial setup and periodic updates
+1. Users have access to devices with modern web browsers (desktop, tablet, or mobile)
+2. Users have internet connectivity to access the web application
 3. Publicly validated medical screening guidelines are available and accessible
 4. Healthcare facilities in target regions support appointment booking integrations
 5. Users understand that the app provides guidance, not medical diagnosis
 6. Synthetic or publicly available datasets are sufficient for AI training
+7. AWS cloud services are available and reliable for hosting the application
 
 ### Limitations
 
@@ -267,18 +272,21 @@ Prosper addresses these gaps by providing a centralized, AI-powered platform tha
 4. Appointment booking availability depends on integration with healthcare facility systems
 5. The RAG chatbot is limited to information in its knowledge base and cannot answer all health questions
 6. Regional guideline availability may vary, affecting recommendation specificity
-7. The app requires periodic internet connectivity for updates and chatbot functionality
+7. The app requires internet connectivity for full functionality
 8. AI recommendations are probabilistic and may not be 100% accurate in all cases
+9. Web app does not support offline access like native mobile applications
 
 ## Future Scope
 
 ### Phase 2 Enhancements
 
-1. Integration with wearable devices for real-time health monitoring
-2. Telemedicine consultation features for follow-up discussions
-3. Health record integration (with user consent) for more personalized recommendations
-4. Community features for health challenges and peer support
-5. Expanded coverage of additional disease categories (respiratory, neurological)
+1. Progressive Web App (PWA) capabilities for offline access and app-like experience
+2. Integration with wearable devices for real-time health monitoring
+3. Telemedicine consultation features for follow-up discussions
+4. Health record integration (with user consent) for more personalized recommendations
+5. Community features for health challenges and peer support
+6. Expanded coverage of additional disease categories (respiratory, neurological)
+7. Native mobile app versions for iOS and Android
 
 ### Advanced AI Features
 
