@@ -1,422 +1,85 @@
-# Prosper - Feature Overview
+# Prosper - Solution Features
 
-## Solution Features
-
-### 1. Personalized Health Screening Recommendations
-
-**Description**: AI-powered screening recommendations based on user demographics, lifestyle factors, and validated medical guidelines.
-
-**Key Capabilities**:
-- Age, gender, and region-specific recommendations
-- Risk assessment based on lifestyle factors (smoking, alcohol, exercise, diet)
-- Family history consideration
-- Prioritized screening list with explanations
-- Source citations from USPSTF, WHO, CDC, NCI, ACS
-
-**Visual Representation**:
+```mermaid
+graph TB
+    subgraph "PROSPER PREVENTIVE HEALTHCARE PLATFORM"
+        
+        subgraph "Core Features"
+            F1[🎯 Personalized Screening<br/>Recommendations<br/>━━━━━━━━━━━━━━━<br/>• Age, gender, region-based<br/>• Risk assessment algorithm<br/>• Lifestyle factor analysis<br/>• Family history consideration<br/>• Priority-based ranking<br/>• Source citations USPSTF/WHO/CDC]
+            
+            F2[💬 RAG-Based Health<br/>Information Chatbot<br/>━━━━━━━━━━━━━━━<br/>• Amazon Bedrock LLM<br/>• Vector search OpenSearch<br/>• Safety filters no diagnosis<br/>• Source citations<br/>• Conversation history<br/>• Automatic disclaimers]
+            
+            F3[🔔 Smart Reminder<br/>System<br/>━━━━━━━━━━━━━━━<br/>• Email notifications SES<br/>• SMS alerts SNS<br/>• In-app notifications<br/>• Recurring scheduling<br/>• Completion tracking<br/>• Auto next-due calculation]
+            
+            F4[🏥 Hospital Appointment<br/>Booking<br/>━━━━━━━━━━━━━━━<br/>• Facility search by location<br/>• Real-time slot availability<br/>• Step Functions workflow<br/>• Booking confirmation<br/>• Cancellation/rescheduling<br/>• Auto reminder creation]
+            
+            F5[👤 User Profile &<br/>Risk Assessment<br/>━━━━━━━━━━━━━━━<br/>• Demographics tracking<br/>• Lifestyle factors<br/>• Family medical history<br/>• Multi-dimensional risk scores<br/>• Secure encryption<br/>• Privacy controls]
+            
+            F6[📚 Educational Health<br/>Content<br/>━━━━━━━━━━━━━━━<br/>• Cancer screening awareness<br/>• Lifestyle disease prevention<br/>• Medical guideline summaries<br/>• FAQ section<br/>• Multi-language support<br/>• Accessible formatting]
+        end
+        
+        subgraph "Technology Foundation"
+            T1[⚡ AWS Lambda<br/>Serverless Compute]
+            T2[🔐 Amazon Cognito<br/>Authentication]
+            T3[🤖 Amazon Bedrock<br/>AI/ML Services]
+            T4[💾 DynamoDB + RDS<br/>Data Storage]
+            T5[🌐 CloudFront + S3<br/>Hosting & CDN]
+            T6[📡 API Gateway<br/>REST APIs]
+        end
+        
+        subgraph "Key Differentiators"
+            D1[✅ Evidence-Based<br/>Validated Guidelines]
+            D2[✅ Responsible AI<br/>No Diagnosis]
+            D3[✅ Privacy-First<br/>GDPR Compliant]
+            D4[✅ Comprehensive<br/>Multi-Disease Coverage]
+            D5[✅ Accessible<br/>WCAG 2.1 AA]
+            D6[✅ Cost-Effective<br/>$130-290/month Demo]
+        end
+    end
+    
+    F1 --> F3
+    F1 --> F4
+    F2 --> F6
+    F3 --> F4
+    F5 --> F1
+    
+    T1 --> F1
+    T1 --> F2
+    T1 --> F3
+    T1 --> F4
+    T2 --> F5
+    T3 --> F2
+    T4 --> F1
+    T4 --> F5
+    T5 --> F6
+    T6 --> F1
+    T6 --> F2
+    
+    F1 -.-> D1
+    F2 -.-> D2
+    F5 -.-> D3
+    F1 -.-> D4
+    F6 -.-> D5
+    T1 -.-> D6
+    
+    style F1 fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style F2 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style F3 fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style F4 fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    style F5 fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style F6 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    
+    style T1 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style T2 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style T3 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style T4 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style T5 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style T6 fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    
+    style D1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style D2 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style D3 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style D4 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style D5 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style D6 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 ```
-┌─────────────────────────────────────────────────────────┐
-│  DASHBOARD - Your Health Screening Recommendations      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌──────────────────────────────────────────┐          │
-│  │ 🔴 HIGH PRIORITY                          │          │
-│  │ Mammography Screening                     │          │
-│  │ Recommended: Annually                     │          │
-│  │ Based on: Age 45+, Female                │          │
-│  │ Source: USPSTF Grade B                    │          │
-│  │ [Set Reminder] [Book Appointment]         │          │
-│  └──────────────────────────────────────────┘          │
-│                                                          │
-│  ┌──────────────────────────────────────────┐          │
-│  │ 🟡 MEDIUM PRIORITY                        │          │
-│  │ Blood Pressure Check                      │          │
-│  │ Recommended: Every 2 years                │          │
-│  │ Based on: Age 40+, Family History        │          │
-│  │ Source: AHA Guidelines                    │          │
-│  │ [Set Reminder] [Book Appointment]         │          │
-│  └──────────────────────────────────────────┘          │
-│                                                          │
-│  Filter: [All] [Cancer] [Cardiovascular] [Metabolic]   │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### 2. RAG-Based Health Information Chatbot
-
-**Description**: Intelligent chatbot powered by Amazon Bedrock that answers health questions using validated public health sources.
-
-**Key Capabilities**:
-- Natural language query processing
-- Retrieval-Augmented Generation (RAG) for accurate responses
-- Safety filters to prevent diagnostic/treatment advice
-- Source citations for transparency
-- Conversation history tracking
-- Automatic disclaimer injection
-
-**Visual Representation**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  💬 Health Information Assistant                        │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  You: When should I get a colonoscopy?                  │
-│                                                          │
-│  ┌────────────────────────────────────────────┐        │
-│  │ Assistant:                                  │        │
-│  │                                             │        │
-│  │ According to USPSTF guidelines, colorectal │        │
-│  │ cancer screening is recommended for adults │        │
-│  │ aged 45-75. Colonoscopy is one option and  │        │
-│  │ is typically performed every 10 years if   │        │
-│  │ results are normal.                         │        │
-│  │                                             │        │
-│  │ 📚 Sources:                                 │        │
-│  │ • USPSTF Colorectal Cancer Screening       │        │
-│  │ • CDC Screening Guidelines                 │        │
-│  │                                             │        │
-│  │ ⚠️ This is educational information only.   │        │
-│  │ Please consult a healthcare professional.  │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  [Type your question here...] [Send]                    │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### 3. Smart Reminder System
-
-**Description**: Automated reminder system for health screenings and appointments with multi-channel notifications.
-
-**Key Capabilities**:
-- Email and SMS notifications
-- In-app notification badges
-- Recurring reminder scheduling
-- Reminder completion tracking
-- Automatic next-due-date calculation
-- Integration with appointment bookings
-
-**Visual Representation**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  🔔 Your Health Reminders                               │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  UPCOMING (3)                                            │
-│  ┌────────────────────────────────────────────┐        │
-│  │ 📅 March 15, 2026 - 9:00 AM                │        │
-│  │ Blood Pressure Check                        │        │
-│  │ Location: City General Hospital             │        │
-│  │ [Mark Complete] [Reschedule]                │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  ┌────────────────────────────────────────────┐        │
-│  │ 📅 April 10, 2026                           │        │
-│  │ Mammography Screening                       │        │
-│  │ No appointment booked yet                   │        │
-│  │ [Book Appointment] [Snooze]                 │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  COMPLETED (5)                                           │
-│  ✓ Blood Test - Completed Feb 1, 2026                  │
-│  ✓ Dental Checkup - Completed Jan 15, 2026             │
-│                                                          │
-│  [+ Create New Reminder]                                │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### 4. Hospital Appointment Booking
-
-**Description**: Integrated appointment booking system with healthcare facilities for screening tests.
-
-**Key Capabilities**:
-- Facility search by location and screening type
-- Real-time slot availability
-- Appointment confirmation and management
-- Automatic reminder creation
-- Cancellation and rescheduling
-- Fallback contact information
-
-**Visual Representation**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  🏥 Book Appointment - Mammography Screening            │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  Step 1: Select Facility                                │
-│  ┌────────────────────────────────────────────┐        │
-│  │ ⭐ City General Hospital                    │        │
-│  │ 123 Main St, San Francisco, CA             │        │
-│  │ ⭐⭐⭐⭐⭐ 4.8 (250 reviews)                  │        │
-│  │ [Select]                                    │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  Step 2: Choose Date & Time                             │
-│  ┌────────────────────────────────────────────┐        │
-│  │  March 2026                                 │        │
-│  │  Su Mo Tu We Th Fr Sa                       │        │
-│  │              1  2  3  4                     │        │
-│  │   5  6  7  8  9 10 11                       │        │
-│  │  12 13 14 [15] 16 17 18                     │        │
-│  │                                             │        │
-│  │  Available Times:                           │        │
-│  │  [9:00 AM] [10:30 AM] [2:00 PM] [4:00 PM]  │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  [Back] [Confirm Booking]                               │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### 5. User Profile & Risk Assessment
-
-**Description**: Comprehensive user profile management with lifestyle factor tracking for personalized recommendations.
-
-**Key Capabilities**:
-- Demographics (age, gender, region)
-- Lifestyle factors (smoking, alcohol, exercise, diet)
-- Family medical history
-- Secure data encryption
-- Profile editing and updates
-- Privacy controls
-
-**Visual Representation**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  👤 Your Health Profile                                  │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  DEMOGRAPHICS                                            │
-│  Age: 45 years                                           │
-│  Gender: Female                                          │
-│  Region: California, USA                                 │
-│                                                          │
-│  LIFESTYLE FACTORS                                       │
-│  🚭 Smoking: Never                                       │
-│  🍷 Alcohol: Moderate (1-2 drinks/week)                 │
-│  🏃 Exercise: 3-5 times per week                         │
-│  🥗 Diet: Balanced                                       │
-│                                                          │
-│  FAMILY HISTORY                                          │
-│  ✓ Cardiovascular disease (Mother)                      │
-│  ✓ Diabetes (Father)                                     │
-│                                                          │
-│  RISK ASSESSMENT                                         │
-│  ┌────────────────────────────────────────────┐        │
-│  │ Cardiovascular: 🟡 Moderate Risk            │        │
-│  │ Cancer: 🟡 Moderate Risk                    │        │
-│  │ Metabolic: 🟢 Low Risk                      │        │
-│  │ Liver: 🟢 Low Risk                          │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  [Edit Profile] [Privacy Settings]                      │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### 6. Educational Health Content
-
-**Description**: Curated educational resources about cancer screening and lifestyle disease prevention.
-
-**Key Capabilities**:
-- Cancer screening awareness content
-- Lifestyle disease prevention guides
-- Medical guideline summaries
-- FAQ section
-- Multi-language support
-- Accessible content formatting
-
-**Visual Representation**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  📚 Health Education Center                              │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  CANCER SCREENING                                        │
-│  ┌────────────────────────────────────────────┐        │
-│  │ 🎗️ Breast Cancer Screening                 │        │
-│  │ Learn about mammography, when to start,    │        │
-│  │ and what to expect.                         │        │
-│  │ [Read More →]                               │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  ┌────────────────────────────────────────────┐        │
-│  │ 🎗️ Colorectal Cancer Screening             │        │
-│  │ Understanding colonoscopy, FIT tests, and   │        │
-│  │ screening schedules.                        │        │
-│  │ [Read More →]                               │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  LIFESTYLE DISEASES                                      │
-│  ┌────────────────────────────────────────────┐        │
-│  │ ❤️ Cardiovascular Health                    │        │
-│  │ Prevention strategies, risk factors, and    │        │
-│  │ screening recommendations.                  │        │
-│  │ [Read More →]                               │        │
-│  └────────────────────────────────────────────┘        │
-│                                                          │
-│  [Browse All Topics] [Search]                           │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## System Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         USER DEVICES                             │
-│              (Desktop, Tablet, Mobile Browsers)                  │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLOUDFRONT CDN                                │
-│                  (Content Delivery)                              │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    S3 STATIC HOSTING                             │
-│                  (React Web Application)                         │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    API GATEWAY                                   │
-│              (REST APIs + Authentication)                        │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-    ┌────────┐     ┌────────┐     ┌────────┐
-    │Cognito │     │Lambda  │     │Lambda  │
-    │ Auth   │     │Profile │     │Chatbot │
-    └────────┘     └───┬────┘     └───┬────┘
-                       │              │
-         ┌─────────────┼──────────────┼─────────────┐
-         ▼             ▼              ▼             ▼
-    ┌────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
-    │DynamoDB│   │   RDS   │   │Bedrock  │   │OpenSearch│
-    │ Users  │   │Guidelines│   │  LLM    │   │ Vectors │
-    └────────┘   └─────────┘   └─────────┘   └─────────┘
-```
-
----
-
-## User Journey Flow
-
-```
-START
-  │
-  ▼
-┌─────────────┐
-│  Sign Up    │ ← Email verification via Cognito
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Create Profile│ ← Enter demographics & lifestyle
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Dashboard  │ ← View personalized recommendations
-└──────┬──────┘
-       │
-       ├──────────────┐
-       │              │
-       ▼              ▼
-┌─────────────┐  ┌─────────────┐
-│Set Reminder │  │Book Appt    │
-└──────┬──────┘  └──────┬──────┘
-       │                │
-       ▼                ▼
-┌─────────────┐  ┌─────────────┐
-│Get Notified │  │Attend Appt  │
-└──────┬──────┘  └──────┬──────┘
-       │                │
-       └────────┬───────┘
-                │
-                ▼
-         ┌─────────────┐
-         │Mark Complete│
-         └──────┬──────┘
-                │
-                ▼
-         ┌─────────────┐
-         │Next Reminder│ ← Automatic scheduling
-         └─────────────┘
-```
-
----
-
-## Key Differentiators
-
-### 1. Responsible AI Design
-- No diagnostic outputs
-- Clear disclaimers on all AI-generated content
-- Safety filters prevent medical advice
-- Transparent source citations
-- Bias detection and mitigation
-
-### 2. Evidence-Based Recommendations
-- Validated medical guidelines (USPSTF, WHO, CDC, NCI, ACS)
-- Regular guideline updates
-- Source transparency
-- Risk-based prioritization
-
-### 3. Privacy-First Approach
-- Synthetic data only for demos
-- End-to-end encryption
-- GDPR compliance
-- User data control (export, delete)
-- Minimal data collection
-
-### 4. Comprehensive Preventive Care
-- Multiple disease categories (cardiovascular, cancer, metabolic, liver)
-- Personalized risk assessment
-- Integrated reminder and booking system
-- Educational resources
-
-### 5. Accessible & User-Friendly
-- Responsive web design
-- WCAG 2.1 AA compliance
-- Multi-language support
-- Clear, jargon-free language
-- Intuitive navigation
-
----
-
-## Technical Highlights
-
-### Scalability
-- Serverless architecture (AWS Lambda)
-- Auto-scaling data stores (DynamoDB on-demand)
-- CDN for global content delivery
-- Pay-per-use pricing model
-
-### AI/ML Innovation
-- RAG (Retrieval-Augmented Generation) chatbot
-- Vector search with OpenSearch
-- Amazon Bedrock LLM integration
-- Intelligent risk assessment algorithms
-
-### Security & Compliance
-- Amazon Cognito authentication
-- Data encryption at rest and in transit
-- HIPAA-aligned practices
-- Audit logging with CloudTrail
-- Least-privilege IAM policies
-
----
-
-**Document Version:** 1.0  
-**Last Updated:** February 15, 2026  
-**Status:** Feature Overview Complete
