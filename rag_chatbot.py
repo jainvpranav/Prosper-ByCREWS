@@ -166,7 +166,6 @@ def main():
         # Retrieve
         q_emb = embedder.encode([user_input])[0].tolist()
         top_k_val = top_k(q_emb, kb, k=5)
-        print(top_k_val)
         context = "\n\n---\n\n".join(top_k_val)
 
         # Build history prefix (last 3 turns)
