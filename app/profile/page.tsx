@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Lock, Trophy, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, Trophy, ArrowRight, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
+
+// TODO: Replace with real user ID from session/auth once NextAuth is wired up.
+// e.g.: const { data: session } = useSession(); const userId = session?.user?.id;
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 const steps = [
   { name: 'Basics', xp: 15 },
@@ -51,6 +55,7 @@ const mascotMessages = [
 export default function ProfilePage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     age: '',
     gender: '',
@@ -84,11 +89,26 @@ export default function ProfilePage() {
     }
   };
 
-  const handleComplete = () => {
-    toast.success('Profile complete! +35 XP earned!');
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 500);
+  const handleComplete = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: DEMO_USER_ID, ...formData }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? 'Failed to save profile');
+      }
+      toast.success('Profile saved! +35 XP earned! 🎉');
+      setTimeout(() => router.push('/dashboard'), 600);
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not save your profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleMultiSelect = (field: string, value: string) => {
@@ -482,9 +502,14 @@ export default function ProfilePage() {
             {currentStep === steps.length - 1 ? (
               <button
                 onClick={handleComplete}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+                disabled={isSaving}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Generate Care Plan <ArrowRight className="w-4 h-4" />
+                {isSaving ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                ) : (
+                  <>Generate Care Plan <ArrowRight className="w-4 h-4" /></>
+                )}
               </button>
             ) : (
               <button

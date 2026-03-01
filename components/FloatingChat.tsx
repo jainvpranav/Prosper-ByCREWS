@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, X, MessageCircle } from 'lucide-react';
 import { MascotMini } from './Mascot';
 import { usePathname } from 'next/navigation';
+import { sendChatMessage } from '@/lib/chatService';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
@@ -12,28 +14,12 @@ interface Message {
   timestamp: Date;
 }
 
-const mockAIResponses: Record<string, string> = {
-  hello: "Hey there! I'm Pip, your AI health companion. I'm here to help you understand your health better and answer any questions you have!",
-  health: "Your health is important! Based on your profile, I can see some areas we can work on together. Would you like me to provide specific recommendations?",
-  risk: "Looking at your risk assessment, we've identified a few areas to focus on. The good news is that many health risks can be reduced with lifestyle changes!",
-  appointment: "I can help you schedule an appointment with a healthcare provider. Would you like to check available slots?",
-  default: "That's a great question! I'd love to help. Could you tell me more about what you're interested in?",
-};
-
+// Removed mockAIResponses and getAIResponse as we now use a live API
 const suggestionChips = [
   'Tell me about my health',
   'How do I lower my risk?',
   'Schedule an appointment',
 ];
-
-function getAIResponse(userMessage: string): string {
-  const lower = userMessage.toLowerCase();
-  if (lower.includes('hello') || lower.includes('hi')) return mockAIResponses.hello;
-  if (lower.includes('health')) return mockAIResponses.health;
-  if (lower.includes('risk')) return mockAIResponses.risk;
-  if (lower.includes('appointment') || lower.includes('book')) return mockAIResponses.appointment;
-  return mockAIResponses.default;
-}
 
 function TypingIndicator() {
   return (
@@ -96,17 +82,20 @@ export function FloatingChat() {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
+    try {
+      const responseText = await sendChatMessage(text);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: getAIResponse(text),
+        text: responseText,
         sender: 'ai',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (error: any) {
+      toast.error(error.message || 'Cloud not connect to Pip. Please try again.');
+    } finally {
       setIsTyping(false);
-    }, 800);
+    }
   };
 
   const handleSuggestion = (suggestion: string) => {

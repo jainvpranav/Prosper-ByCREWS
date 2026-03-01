@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
-import { Search, Star, MapPin, Clock, Sun, Cloud, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Search, Star, MapPin, Clock, Sun, Cloud,
+  CheckCircle2, ChevronLeft, ChevronRight, Loader2,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import type { Appointment } from '@/lib/appointmentsService';
+
+// TODO: Replace with real session user ID once auth is wired
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 const locations = [
   {
@@ -30,26 +38,8 @@ const locations = [
 ];
 
 const timeSlots = {
-  morning: [
-    '08:00 AM',
-    '08:30 AM',
-    '09:00 AM',
-    '09:30 AM',
-    '10:00 AM',
-    '10:30 AM',
-    '11:00 AM',
-    '11:30 AM',
-  ],
-  afternoon: [
-    '12:30 PM',
-    '01:00 PM',
-    '01:30 PM',
-    '02:00 PM',
-    '02:30 PM',
-    '03:00 PM',
-    '03:30 PM',
-    '04:00 PM',
-  ],
+  morning: ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'],
+  afternoon: ['12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'],
 };
 
 export default function AppointmentsPage() {
@@ -58,41 +48,82 @@ export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [bookedAppointment, setBookedAppointment] = useState<Appointment | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
+  // Past appointments from DB
+  const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
+  const [loadingPast, setLoadingPast] = useState(true);
 
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
+  useEffect(() => {
+    async function loadAppointments() {
+      try {
+        const res = await fetch(`/api/appointments?userId=${DEMO_USER_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPastAppointments(data.appointments ?? []);
+        }
+      } catch {
+        // Non-blocking — just won't show past appointments
+      } finally {
+        setLoadingPast(false);
+      }
+    }
+    loadAppointments();
+  }, []);
+
+  const getDaysInMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const getFirstDayOfMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
   const daysInMonth = getDaysInMonth(currentMonth);
   const firstDay = getFirstDayOfMonth(currentMonth);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const emptyDays = Array.from({ length: firstDay }, (_, i) => i);
 
-  const handlePrevMonth = () => {
+  const handlePrevMonth = () =>
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
+  const handleNextMonth = () =>
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
-  };
-
   const handleDateSelect = (day: number) => {
-    setSelectedDate(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
-    );
+    setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day));
     setSelectedSlot(null);
   };
 
-  const handleConfirm = () => {
-    if (selectedDate && selectedSlot) {
+  const handleConfirm = async () => {
+    if (!selectedDate || !selectedSlot) return;
+    setIsSubmitting(true);
+    try {
+      const appointmentDate = selectedDate.toISOString().slice(0, 10); // YYYY-MM-DD
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: DEMO_USER_ID,
+          locationName: selectedLocation.name,
+          appointmentDate,
+          timeSlot: selectedSlot,
+          provider: 'Dr. Sarah Chen, MD',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? 'Booking failed');
+      }
+      const data = await res.json();
+      setBookedAppointment(data.appointment);
       setConfirmed(true);
+      toast.success('Appointment booked successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not book the appointment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // ── Confirmation screen ─────────────────────────────────────────────────
   if (confirmed && selectedDate && selectedSlot) {
     return (
       <main className="bg-background min-h-screen">
@@ -110,12 +141,10 @@ export default function AppointmentsPage() {
                   <p className="font-bold text-lg">{selectedLocation.name}</p>
                 </div>
                 <div className="border-t border-border pt-4">
-                  <p className="text-muted-foreground text-sm">Date & Time</p>
+                  <p className="text-muted-foreground text-sm">Date &amp; Time</p>
                   <p className="font-bold text-lg">
                     {selectedDate.toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
+                      weekday: 'long', month: 'long', day: 'numeric',
                     })}{' '}
                     at {selectedSlot}
                   </p>
@@ -124,10 +153,16 @@ export default function AppointmentsPage() {
                   <p className="text-muted-foreground text-sm">Provider</p>
                   <p className="font-bold text-lg">Dr. Sarah Chen, MD</p>
                 </div>
+                {bookedAppointment && (
+                  <div className="border-t border-border pt-4">
+                    <p className="text-muted-foreground text-sm">Confirmation ID</p>
+                    <p className="font-mono text-xs text-muted-foreground">{bookedAppointment.appointmentId}</p>
+                  </div>
+                )}
               </div>
             </div>
             <p className="text-muted-foreground mb-6">
-              A confirmation email has been sent to your inbox. You'll receive a reminder 24 hours before your appointment.
+              A confirmation email has been sent to your inbox. You&apos;ll receive a reminder 24 hours before.
             </p>
             <button
               onClick={() => window.location.href = '/dashboard'}
@@ -141,6 +176,7 @@ export default function AppointmentsPage() {
     );
   }
 
+  // ── Booking screen ──────────────────────────────────────────────────────
   return (
     <main className="bg-background min-h-screen">
       <Navbar />
@@ -153,6 +189,28 @@ export default function AppointmentsPage() {
             <h1 className="text-3xl md:text-4xl font-bold mb-2">Book an Appointment</h1>
             <p className="text-muted-foreground">Find a healthcare provider and schedule your visit</p>
           </div>
+
+          {/* Past Appointments Strip */}
+          {!loadingPast && pastAppointments.length > 0 && (
+            <div className="mb-10">
+              <h2 className="text-lg font-bold mb-4">Your Appointments</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pastAppointments.slice(0, 3).map((appt) => (
+                  <div key={appt.appointmentId} className="bg-card border border-border rounded-2xl p-4">
+                    <p className="font-semibold text-sm">{appt.locationName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{appt.appointmentDate} at {appt.timeSlot}</p>
+                    <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      appt.appointmentStatus === 'Scheduled' ? 'bg-primary/10 text-primary' :
+                      appt.appointmentStatus === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      {appt.appointmentStatus}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Main Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -181,11 +239,7 @@ export default function AppointmentsPage() {
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <img
-                      src={loc.image}
-                      alt={loc.name}
-                      className="w-full h-32 object-cover"
-                    />
+                    <img src={loc.image} alt={loc.name} className="w-full h-32 object-cover" />
                     <div className="p-3">
                       <p className="font-semibold text-sm">{loc.name}</p>
                       <div className="flex items-center justify-between mt-2">
@@ -209,22 +263,13 @@ export default function AppointmentsPage() {
               <h2 className="text-lg font-bold mb-4">Select Date</h2>
               <div className="bg-card border border-border rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <button
-                    onClick={handlePrevMonth}
-                    className="p-1 hover:bg-muted rounded-lg transition-colors"
-                  >
+                  <button onClick={handlePrevMonth} className="p-1 hover:bg-muted rounded-lg transition-colors">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <h3 className="font-semibold text-sm">
-                    {currentMonth.toLocaleDateString('en-US', {
-                      month: 'long',
-                      year: 'numeric',
-                    })}
+                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h3>
-                  <button
-                    onClick={handleNextMonth}
-                    className="p-1 hover:bg-muted rounded-lg transition-colors"
-                  >
+                  <button onClick={handleNextMonth} className="p-1 hover:bg-muted rounded-lg transition-colors">
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -238,16 +283,13 @@ export default function AppointmentsPage() {
                 </div>
 
                 <div className="grid grid-cols-7 gap-1">
-                  {emptyDays.map((_, idx) => (
-                    <div key={`empty-${idx}`} className="h-8" />
-                  ))}
+                  {emptyDays.map((_, idx) => <div key={`empty-${idx}`} className="h-8" />)}
                   {days.map((day) => (
                     <button
                       key={day}
                       onClick={() => handleDateSelect(day)}
                       className={`h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
-                        selectedDate?.getDate() === day &&
-                        selectedDate.getMonth() === currentMonth.getMonth()
+                        selectedDate?.getDate() === day && selectedDate.getMonth() === currentMonth.getMonth()
                           ? 'bg-primary text-primary-foreground'
                           : 'hover:bg-muted'
                       }`}
@@ -263,10 +305,7 @@ export default function AppointmentsPage() {
             <div className="lg:col-span-2">
               <h2 className="text-lg font-bold mb-4">
                 {selectedDate
-                  ? `Select Time - ${selectedDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}`
+                  ? `Select Time — ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                   : 'Select a date first'}
               </h2>
 
@@ -318,7 +357,7 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
 
-                  {/* Summary */}
+                  {/* Booking Summary */}
                   {selectedSlot && (
                     <div className="bg-card border-2 border-primary rounded-2xl p-4">
                       <h3 className="font-bold mb-3">Booking Summary</h3>
@@ -330,11 +369,7 @@ export default function AppointmentsPage() {
                         <div className="flex justify-between border-t border-border pt-2">
                           <span className="text-muted-foreground">Date:</span>
                           <span className="font-medium">
-                            {selectedDate.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
+                            {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </div>
                         <div className="flex justify-between border-t border-border pt-2">
@@ -344,9 +379,14 @@ export default function AppointmentsPage() {
                       </div>
                       <button
                         onClick={handleConfirm}
-                        className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+                        disabled={isSubmitting}
+                        className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
-                        Confirm Appointment
+                        {isSubmitting ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Booking…</>
+                        ) : (
+                          'Confirm Appointment'
+                        )}
                       </button>
                     </div>
                   )}

@@ -1,11 +1,21 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Dna, Flame, Timer, CheckCircle2, AlertCircle, Sparkles, Download, TrendingUp } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import {
+  AlertTriangle, Dna, Flame, Timer, CheckCircle2, AlertCircle,
+  Sparkles, Download, TrendingUp, Loader2,
+} from 'lucide-react';
+import type { RiskAssessment } from '@/lib/riskAssessmentService';
 
-const projectionData = [
+// TODO: Replace with real session user ID
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+const FALLBACK_PROJECTIONS = [
   { month: 'Month 0', predicted: 82, baseline: 82 },
   { month: 'Month 1', predicted: 80, baseline: 82 },
   { month: 'Month 2', predicted: 77, baseline: 82 },
@@ -15,7 +25,7 @@ const projectionData = [
   { month: 'Month 6', predicted: 55, baseline: 82 },
 ];
 
-const riskFactorsData = [
+const FALLBACK_RISK_FACTORS = [
   { name: 'Age', value: 35 },
   { name: 'Family History', value: 28 },
   { name: 'Vitals', value: 15 },
@@ -23,6 +33,46 @@ const riskFactorsData = [
 ];
 
 export default function RiskAssessmentPage() {
+  const [loading, setLoading] = useState(true);
+  const [assessment, setAssessment] = useState<RiskAssessment | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadAssessment() {
+      try {
+        const res = await fetch(`/api/risk-assessment?userId=${DEMO_USER_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAssessment(data.assessment ?? null);
+        }
+      } catch (err) {
+        console.error('[RiskAssessment] Failed to load:', err);
+        setError('Could not load assessment data. Showing demo data.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAssessment();
+  }, []);
+
+  const projectionData = assessment?.projections?.map((p) => ({
+    month: `Month ${p.monthOffset}`,
+    predicted: p.predictedScore,
+    baseline: p.baselineScore,
+  })) ?? FALLBACK_PROJECTIONS;
+
+  const riskFactorsData = assessment?.riskFactors?.map((f) => ({
+    name: f.factorName,
+    value: f.contributionPct,
+  })) ?? FALLBACK_RISK_FACTORS;
+
+  const overallScore    = assessment?.overallRiskScore ?? 82;
+  const geneticDisp     = assessment?.geneticDisposition ?? 'Moderate';
+  const lifestyleImpact = assessment?.lifestyleImpact ?? 'Critical';
+  const medHistoryRisk  = assessment?.medicalHistoryRisk ?? 'Low Risk';
+  const aiSummary = assessment?.aiInsightSummary ??
+    'Your health assessment shows moderate risk with significant opportunities for improvement through lifestyle changes. Focus on increasing physical activity, improving sleep quality, and managing stress.';
+
   return (
     <main className="bg-background min-h-screen">
       <Navbar />
@@ -30,12 +80,30 @@ export default function RiskAssessmentPage() {
 
       <div className="px-4 sm:px-6 lg:px-8 py-12 md:py-20">
         <div className="mx-auto max-w-7xl">
+
+          {/* Loading / Error Banner */}
+          {loading && (
+            <div className="flex items-center gap-3 mb-8 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Loading your risk assessment…</span>
+            </div>
+          )}
+          {error && (
+            <div className="mb-8 px-4 py-3 rounded-xl bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 text-sm">
+              ⚠️ {error}
+            </div>
+          )}
+
           {/* Header */}
           <div className="mb-12">
             <div className="flex items-center justify-between flex-col sm:flex-row gap-4 mb-6">
               <div>
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
-                  <span className="text-sm font-medium text-primary">Health Risk Assessment</span>
+                  <span className="text-sm font-medium text-primary">
+                    {assessment
+                      ? `Assessed: ${new Date(assessment.assessedAt).toLocaleDateString()}`
+                      : 'Health Risk Assessment'}
+                  </span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold">Risk Assessment Analysis</h1>
                 <p className="text-muted-foreground mt-2">Comprehensive evaluation of your health risks</p>
@@ -60,7 +128,7 @@ export default function RiskAssessmentPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Overall Risk Score</p>
-                  <p className="text-3xl font-bold mt-1">82/100</p>
+                  <p className="text-3xl font-bold mt-1">{overallScore}/100</p>
                 </div>
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
@@ -71,7 +139,7 @@ export default function RiskAssessmentPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Genetic Disposition</p>
-                  <p className="text-3xl font-bold mt-1">Moderate</p>
+                  <p className="text-3xl font-bold mt-1">{geneticDisp}</p>
                 </div>
                 <Dna className="w-8 h-8 text-violet-500" />
               </div>
@@ -82,7 +150,7 @@ export default function RiskAssessmentPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Lifestyle Impact</p>
-                  <p className="text-3xl font-bold mt-1">Critical</p>
+                  <p className="text-3xl font-bold mt-1">{lifestyleImpact}</p>
                 </div>
                 <Flame className="w-8 h-8 text-orange-500" />
               </div>
@@ -93,7 +161,7 @@ export default function RiskAssessmentPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Medical History</p>
-                  <p className="text-3xl font-bold mt-1">Low Risk</p>
+                  <p className="text-3xl font-bold mt-1">{medHistoryRisk}</p>
                 </div>
                 <Timer className="w-8 h-8 text-teal-500" />
               </div>
@@ -192,15 +260,14 @@ export default function RiskAssessmentPage() {
               <Sparkles className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <h3 className="font-bold mb-2">Assessment Summary</h3>
-                <p className="text-muted-foreground mb-4">
-                  Your health assessment shows moderate risk with significant opportunities for improvement through lifestyle changes. Focus on increasing physical activity, improving sleep quality, and managing stress.
-                </p>
+                <p className="text-muted-foreground mb-4">{aiSummary}</p>
                 <button className="text-primary font-semibold text-sm hover:gap-2 flex items-center gap-1 transition-all">
                   Chat with Pip for recommendations →
                 </button>
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </main>
