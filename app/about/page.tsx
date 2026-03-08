@@ -7,38 +7,9 @@ export default function About() {
     <main className="bg-background">
       <Navbar />
 
-      {/* Header */}
-      <section className="px-4 sm:px-6 lg:px-8 py-20 md:py-32 bg-gradient-to-b from-background to-muted/30">
+      {/* Story */}
+      <section className="px-4 sm:px-6 lg:px-8 py-20 md:py-32">
         <div className="mx-auto max-w-7xl">
-          <div className="inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-            <span className="text-sm font-medium text-primary">ℹ️ About Us</span>
-          </div>
-
-          <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">Our Mission</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl">
-            Empowering people to take control of their health with AI-powered insights and personalized guidance
-          </p>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="px-4 sm:px-6 lg:px-8 py-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-16">
-            {[
-              { label: 'Active Users', value: '50K+' },
-              { label: 'Health Risks Detected', value: '10K+' },
-              { label: 'Appointments Booked', value: '25K+' },
-              { label: 'Countries', value: '15+' },
-            ].map((stat, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-2xl p-8 text-center">
-                <p className="text-4xl font-bold text-primary mb-2">{stat.value}</p>
-                <p className="text-muted-foreground font-semibold">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Story */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">Our Story</h2>
@@ -97,45 +68,6 @@ export default function About() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </section>
-
-      {/* Team Section */}
-      <section className="px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Meet Our Team</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                name: 'Dr. Sarah Chen',
-                role: 'Chief Medical Officer',
-                image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-              },
-              {
-                name: 'Michael Rodriguez',
-                role: 'AI Research Director',
-                image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-              },
-              {
-                name: 'Emily Watson',
-                role: 'Patient Advocacy Lead',
-                image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=400&q=80',
-              },
-            ].map((member, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
-                <img
-                  src={member.image}
-                  alt={member.name}
-                  className="w-full h-64 object-cover"
-                />
-                <div className="p-6">
-                  <h3 className="font-bold text-lg mb-1">{member.name}</h3>
-                  <p className="text-primary font-semibold text-sm">{member.role}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

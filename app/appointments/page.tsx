@@ -135,7 +135,7 @@ export default function AppointmentsPage() {
             name: el.tags?.name || 'Unnamed Healthcare Facility',
             distance: 'Nearby', 
             rating: (4.0 + Math.random()).toFixed(1), // Mock rating
-            image: 'https://images.unsplash.com/photo-1516534775068-bb6baaf00da8?auto=format&fit=crop&w=300&q=80',
+            image: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e2e8f0'/><path d='M200 120 l0 60 M170 150 l60 0' stroke='%2394a3b8' stroke-width='20' stroke-linecap='square'/></svg>",
           }));
 
           if (fetchedHospitals.length > 0) {
@@ -336,7 +336,7 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {locations.map((loc) => (
                   <button
                     key={loc.id}

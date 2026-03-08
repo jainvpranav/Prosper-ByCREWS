@@ -61,7 +61,7 @@ export default function Home() {
             <div className="flex-1 relative">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl">
                 <img
-                  src="https://images.unsplash.com/photo-1576091160550-112173e7f869?auto=format&fit=crop&w=800&q=80"
+                  src="https://images.unsplash.com/photo-1551076805-e18690c5e53b?auto=format&fit=crop&w=800&q=80"
                   alt="Healthcare dashboard"
                   className="w-full h-auto"
                 />
@@ -142,7 +142,14 @@ export default function Home() {
                 >
                   <Icon className="w-10 h-10 text-primary mb-4" />
                   <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground text-sm">{feature.description}</p>
+                  <p className="text-muted-foreground text-sm mb-4">{feature.description}</p>
+                  <div className="rounded-xl overflow-hidden mt-auto">
+                    <img 
+                      src={`https://images.unsplash.com/photo-${['1505751172876-fa143ce427aa', '1527613426407-449e04836952', '1584036561565-1c39af6a8a3a', '1543332467-f1388bda072f', '1506126613408-eca07ce68773', '1511174511526-11f87966ef4b'][idx]}?auto=format&fit=crop&w=400&q=80`} 
+                      alt={feature.title} 
+                      className="w-full h-32 object-cover transition-transform group-hover:scale-105"
+                    />
+                  </div>
                 </div>
               );
             })}
