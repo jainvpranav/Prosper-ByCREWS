@@ -12,7 +12,7 @@ import {
 import {
   CheckCircle2, AlertCircle, AlertTriangle,
   Sparkles, Download, TrendingUp, Loader2, Heart, ShieldCheck, ShieldAlert,
-  ArrowUpRight, ArrowDownRight, Minus,
+  ArrowUpRight, ArrowDownRight, Minus, Info,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { RiskAssessment } from '@/lib/riskAssessmentService';
@@ -63,13 +63,6 @@ const FALLBACK_PROJECTIONS = [
   { month: 'Month 4', predicted: 68, baseline: 82 },
   { month: 'Month 5', predicted: 62, baseline: 82 },
   { month: 'Month 6', predicted: 55, baseline: 82 },
-];
-
-const FALLBACK_RISK_FACTORS = [
-  { name: 'Age', value: 35 },
-  { name: 'Family History', value: 28 },
-  { name: 'Vitals', value: 15 },
-  { name: 'Activity Level', value: 4 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -164,11 +157,6 @@ export default function DashboardPage() {
     predicted: p.predictedScore,
     baseline: p.baselineScore,
   })) ?? FALLBACK_PROJECTIONS;
-
-  const riskFactorsData = assessment?.riskFactors?.map((f) => ({
-    name: f.factorName,
-    value: f.contributionPct,
-  })) ?? FALLBACK_RISK_FACTORS;
 
   const aiInsight = assessment?.aiInsightSummary ??
     "Based on your profile, your biggest opportunities for improvement are in lifestyle factors. Increasing physical activity and improving sleep quality could reduce your overall risk score by up to 20% in 6 months.";
@@ -289,7 +277,17 @@ export default function DashboardPage() {
 
                 {/* Top Factors */}
                 <div className="p-6 rounded-xl bg-muted/40 border border-border">
-                  <p className="text-sm text-muted-foreground mb-3 font-medium">Top Contributing Factors</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-sm text-muted-foreground font-medium">Top Contributing Factors</p>
+                    <div className="relative group flex items-center">
+                      <Info className="w-4 h-4 text-muted-foreground/70 hover:text-foreground cursor-help transition-colors" />
+                      
+                      {/* Tooltip Content */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 bg-popover text-popover-foreground text-xs rounded-xl shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+                        These factors are identified by the AI risk model (using SHAP analysis) as the most significant clinical or lifestyle data points currently driving your cardiovascular risk score up or down.
+                      </div>
+                    </div>
+                  </div>
                   <ul className="space-y-2">
                     {cardioResult.top_factors.slice(0, 3).map((f, i) => (
                       <li key={i} className="flex items-center justify-between text-sm">
@@ -416,29 +414,6 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : null}
-
-          {/* ------------------------------------------------------------------ */}
-          {/* SECTION: Risk Factor Contribution                                   */}
-          {/* ------------------------------------------------------------------ */}
-          <div className="bg-card border border-border rounded-2xl p-8 mb-12">
-            <h2 className="text-xl font-bold mb-6">Risk Factor Contribution</h2>
-            <div className="space-y-4">
-              {riskFactorsData.map((item, idx) => (
-                <div key={idx}>
-                  <div className="flex justify-between mb-2">
-                    <span className="font-medium text-sm">{item.name}</span>
-                    <span className="text-sm font-semibold text-primary">{item.value}%</span>
-                  </div>
-                  <div className="w-full bg-border rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-primary to-rose-400 h-2 rounded-full"
-                      style={{ width: `${item.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* ------------------------------------------------------------------ */}
           {/* SECTION: 6-Month Projection Chart                                   */}

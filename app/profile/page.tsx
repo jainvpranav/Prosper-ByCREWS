@@ -22,7 +22,7 @@ type Gender = 'Male' | 'Female';
  *   M_Q15–M_Q17  Male only
  */
 type QuestionId =
-  | 'Q1' | 'Q2' | 'Q3' | 'Q4'
+  | 'Q1' | 'Q2' | 'Q_CITY' | 'Q3' | 'Q4'
   | 'Q5' | 'Q6' | 'Q7' | 'Q8' | 'Q9'
   | 'Q10' | 'Q11' | 'Q12' | 'Q13' | 'Q14'
   | 'F_Q15' | 'F_Q16' | 'F_Q17'
@@ -32,6 +32,7 @@ interface Answers {
   // Core
   gender?: Gender;
   age?: number;
+  city?: string;
   heightCm?: number;
   weightKg?: number;
   bmi?: number;
@@ -124,7 +125,8 @@ function getNextQuestionId(current: QuestionId, a: Answers): QuestionId | null {
   switch (current) {
     // Core
     case 'Q1': return 'Q2';
-    case 'Q2': return 'Q3';
+    case 'Q2': return 'Q_CITY';
+    case 'Q_CITY': return 'Q3';
     case 'Q3': return 'Q4';
     case 'Q4': return 'Q5';
 
@@ -176,8 +178,8 @@ export default function ProfilePage() {
   const [cardioResult, setCardioResult] = useState<any | null>(null);
   const [cancerResults, setCancerResults] = useState<any[] | null>(null);
 
-  // Total questions: 14 shared + 3 gender-specific
-  const totalQuestions = 17;
+  // Total questions: 14 shared + 3 gender-specific + 1 location
+  const totalQuestions = 18;
 
   const currentIndex = useMemo(
     () => history.findIndex((q) => q === currentQuestion) + 1,
@@ -384,7 +386,7 @@ export default function ProfilePage() {
               age: answers.age ?? null,
               gender: answers.gender ?? '',
               activityLevel: answers.activityChoice ?? '',
-              city: '',
+              city: answers.city ?? '',
               familyHistory: [],
               smoking: answers.smoker === 1 ? 'Current' : 'Never',
               alcohol: '',
@@ -531,6 +533,7 @@ export default function ProfilePage() {
       // Core
       case 'Q1': return !answers.gender;
       case 'Q2': return !answers.age;
+      case 'Q_CITY': return !answers.city || answers.city.trim().length === 0;
       case 'Q3': return !answers.heightCm || !answers.weightKg;
       case 'Q4': return !answers.skin_type;
 
@@ -576,7 +579,7 @@ export default function ProfilePage() {
 
   // ── Section label for progress bar ─────────────────────
   const sectionLabel = (): string => {
-    if (['Q1','Q2','Q3','Q4'].includes(currentQuestion))                              return 'Core';
+    if (['Q1','Q2','Q_CITY','Q3','Q4'].includes(currentQuestion))                              return 'Core';
     if (['Q5','Q6','Q7','Q8','Q9'].includes(currentQuestion))                         return 'Heart Health';
     if (['Q10','Q11','Q12','Q13','Q14'].includes(currentQuestion))                    return 'Cancer Risk';
     if (['F_Q15','F_Q16','F_Q17'].includes(currentQuestion))                          return 'Breast Health';
@@ -711,6 +714,26 @@ export default function ProfilePage() {
               }
               className="w-full px-4 py-2 rounded-xl border border-border bg-input focus:outline-none focus:ring-2 focus:ring-primary/30"
               placeholder="Age in years"
+            />
+          </>
+        );
+
+      case 'Q_CITY':
+        return (
+          <>
+            <h2 className="text-lg font-semibold mb-2">Q2.5. Which city do you live in?</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Knowing your location helps us contextualize environmental and regional factors.
+            </p>
+            <input
+              type="text"
+              value={answers.city ?? ''}
+              onChange={(e) => updateAnswers({ city: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && answers.city?.trim()) handleNext();
+              }}
+              className="w-full px-4 py-2 rounded-xl border border-border bg-input focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder="e.g. London"
             />
           </>
         );
