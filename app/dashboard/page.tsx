@@ -118,6 +118,47 @@ export default function DashboardPage() {
   const cancerResults = (assessment?.cancerResults as CancerResult[]) ?? null;
   const cardioResult = (assessment?.cardioResult as CardioResult) ?? null;
 
+  const handleExportReport = () => {
+    if (!assessment) return;
+    
+    // Create simple CSV content
+    const csvRows = [];
+    csvRows.push(['Prosper Health Assessment Report']);
+    csvRows.push(['Date Generated', new Date().toISOString()]);
+    csvRows.push([]);
+    csvRows.push(['Overall Risk Score', assessment.overallRiskScore]);
+    csvRows.push(['Genetic Disposition', assessment.geneticDisposition || 'N/A']);
+    csvRows.push(['Lifestyle Impact', assessment.lifestyleImpact || 'N/A']);
+    csvRows.push(['Medical History', assessment.medicalHistoryRisk || 'N/A']);
+    
+    if (cardioResult) {
+      csvRows.push([]);
+      csvRows.push(['Cardiovascular Risk']);
+      csvRows.push(['Probability', `${(cardioResult.risk_probability * 100).toFixed(1)}%`]);
+      csvRows.push(['Category', cardioResult.risk_category]);
+      csvRows.push(['At Risk', cardioResult.at_risk ? 'Yes' : 'No']);
+    }
+
+    if (cancerResults && cancerResults.length > 0) {
+      csvRows.push([]);
+      csvRows.push(['Cancer Risks']);
+      cancerResults.forEach(cr => {
+        csvRows.push([cr.cancer_type, cr.category, `${cr.score}/100`]);
+      });
+    }
+
+    const csvContent = csvRows.map(e => e.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Prosper_Health_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
@@ -202,7 +243,10 @@ export default function DashboardPage() {
                   <TrendingUp className="w-4 h-4" />
                   New Assessment
                 </Link>
-                <button className="px-6 py-2 rounded-xl border border-border text-foreground hover:bg-muted transition-colors font-semibold flex items-center gap-2">
+                <button 
+                  onClick={handleExportReport}
+                  className="px-6 py-2 rounded-xl border border-border text-foreground hover:bg-muted transition-colors font-semibold flex items-center gap-2"
+                >
                   <Download className="w-4 h-4" />
                   Export Report
                 </button>
