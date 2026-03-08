@@ -107,6 +107,23 @@ export default function LoginPage() {
                 'Sign in'
               )}
             </button>
+
+            {/* Demo Credentials */}
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('demo@prosper.health');
+                setPassword('Demo@1234');
+                // Auto-submit after a brief delay so state is set
+                setTimeout(() => {
+                  const form = document.querySelector('form');
+                  if (form) form.requestSubmit();
+                }, 100);
+              }}
+              className="w-full py-2.5 rounded-xl border-2 border-dashed border-primary/40 text-primary font-medium text-sm hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+            >
+              🚀 Use Demo Credentials
+            </button>
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">

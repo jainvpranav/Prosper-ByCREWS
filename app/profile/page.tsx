@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
-import { ChevronLeft, ChevronRight, Loader2, Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Shield, AlertTriangle, CheckCircle2, User, Activity, Heart, Dna, MapPin, Scale, Cigarette, Pill, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { FullProfile } from '@/lib/profileService';
+import type { RiskAssessment } from '@/lib/riskAssessmentService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -167,7 +169,16 @@ function getNextQuestionId(current: QuestionId, a: Answers): QuestionId | null {
 // ---------------------------------------------------------------------------
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  const forceAssess = searchParams.get('mode') === 'assess';
+
+  // ── Profile view state ────────────────────────────────────
+  const [viewMode, setViewMode] = useState<'loading' | 'profile' | 'questionnaire'>('loading');
+  const [profileData, setProfileData] = useState<FullProfile | null>(null);
+  const [assessmentData, setAssessmentData] = useState<RiskAssessment | null>(null);
+
+  // ── Questionnaire state ───────────────────────────────────
   const [answers, setAnswers] = useState<Answers>({});
   const [currentQuestion, setCurrentQuestion] = useState<QuestionId>(FIRST_QUESTION);
   const [history, setHistory] = useState<QuestionId[]>([FIRST_QUESTION]);
@@ -176,6 +187,37 @@ export default function ProfilePage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [cardioResult, setCardioResult] = useState<any | null>(null);
   const [cancerResults, setCancerResults] = useState<any[] | null>(null);
+
+  // ── Load profile data on mount ────────────────────────────
+  useEffect(() => {
+    if (!user) { setViewMode('questionnaire'); return; }
+    if (forceAssess) { setViewMode('questionnaire'); return; }
+
+    async function loadProfile() {
+      try {
+        const [profileRes, assessmentRes] = await Promise.all([
+          fetch(`/api/profile?userId=${user!.userId}`),
+          fetch(`/api/risk-assessment?userId=${user!.userId}`),
+        ]);
+
+        if (profileRes.ok) {
+          const pData = await profileRes.json();
+          setProfileData(pData.profile ?? null);
+        }
+        if (assessmentRes.ok) {
+          const aData = await assessmentRes.json();
+          setAssessmentData(aData.assessment ?? null);
+        }
+
+        // If profile exists, show it; otherwise show questionnaire
+        const pData = profileRes.ok ? (await profileRes.clone().json()).profile : null;
+        setViewMode(pData ? 'profile' : 'questionnaire');
+      } catch {
+        setViewMode('questionnaire');
+      }
+    }
+    loadProfile();
+  }, [user, forceAssess]);
 
   // Total questions: 14 shared + 3 gender-specific + 1 location
   const totalQuestions = 18;
@@ -1408,7 +1450,7 @@ export default function ProfilePage() {
                   <span className="font-semibold">
                     {answers.bmi >= 30 ? 'Obese' : answers.bmi >= 25 ? 'Overweight' : 'Normal'}
                   </span>
-                  {answers.bmi >= 30 && ' · obesity=true will be sent to the prostate model'}
+                  {answers.bmi >= 30}
                 </p>
               </div>
             )}
@@ -1523,7 +1565,154 @@ export default function ProfilePage() {
     }
   };
 
+  // ── Profile View Card ─────────────────────────────────────
+  const ProfileInfoCard = ({ icon: Icon, title, children }: { icon: any, title: string, children: React.ReactNode }) => (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="w-4 h-4 text-primary" />
+        </div>
+        <h3 className="font-semibold text-sm">{title}</h3>
+      </div>
+      <div className="space-y-2 text-sm">{children}</div>
+    </div>
+  );
+
+  const ProfileField = ({ label, value }: { label: string, value: string | number | null | undefined }) => (
+    <div className="flex justify-between py-1.5 border-b border-border/50 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value ?? '—'}</span>
+    </div>
+  );
+
   // ── Render ─────────────────────────────────────────────
+  if (viewMode === 'loading') {
+    return (
+      <main className="bg-background min-h-screen">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Loading your profile…</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (viewMode === 'profile' && profileData) {
+    const bmiVal = profileData.heightCm && profileData.weightKg
+      ? (profileData.weightKg / ((profileData.heightCm / 100) ** 2)).toFixed(1)
+      : null;
+
+    return (
+      <main className="bg-background min-h-screen">
+        <Navbar />
+        <FloatingChat />
+
+        <div className="px-4 sm:px-6 lg:px-8 py-12 md:py-20">
+          <div className="mx-auto max-w-5xl">
+            {/* Header */}
+            <div className="mb-10 flex items-center justify-between flex-col sm:flex-row gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-rose-400 flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold">My Profile</h1>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewMode('questionnaire')}
+                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retake Assessment
+              </button>
+            </div>
+
+            {/* Risk Summary Banner */}
+            {assessmentData && (
+              <div className="mb-8 bg-gradient-to-r from-primary/10 to-rose-400/10 border border-primary/20 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-8 h-8 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Overall Risk Score</p>
+                  <p className="text-3xl font-bold">{assessmentData.overallRiskScore}<span className="text-lg text-muted-foreground font-normal"> / 100</span></p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Assessed {new Date(assessmentData.assessedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex gap-6 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Genetic</p>
+                    <p className="font-semibold">{assessmentData.geneticDisposition ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Lifestyle</p>
+                    <p className="font-semibold">{assessmentData.lifestyleImpact ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Medical</p>
+                    <p className="font-semibold">{assessmentData.medicalHistoryRisk ?? '—'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Profile Data Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Personal Info */}
+              <ProfileInfoCard icon={User} title="Personal Information">
+                <ProfileField label="Gender" value={profileData.gender} />
+                <ProfileField label="Age" value={profileData.age ? `${profileData.age} years` : null} />
+                <ProfileField label="City" value={profileData.city} />
+                <ProfileField label="Activity Level" value={profileData.activityLevel} />
+              </ProfileInfoCard>
+
+              {/* Body Metrics */}
+              <ProfileInfoCard icon={Scale} title="Body Metrics">
+                <ProfileField label="Height" value={profileData.heightCm ? `${profileData.heightCm} cm` : null} />
+                <ProfileField label="Weight" value={profileData.weightKg ? `${profileData.weightKg} kg` : null} />
+                <ProfileField label="BMI" value={bmiVal} />
+                <ProfileField label="Skin Type (Fitzpatrick)" value={profileData.skinType ? `Type ${profileData.skinType}` : null} />
+              </ProfileInfoCard>
+
+              {/* Cardiovascular */}
+              <ProfileInfoCard icon={Heart} title="Cardiovascular Health">
+                <ProfileField label="Smoker" value={profileData.smoker === 1 ? 'Yes' : profileData.smoker === 0 ? 'No' : null} />
+                <ProfileField label="Cigarettes/Day" value={profileData.cigsperday} />
+                <ProfileField label="Hypertension" value={profileData.hypertension === 1 ? 'Yes' : profileData.hypertension === 0 ? 'No' : null} />
+                <ProfileField label="Diabetes" value={profileData.diabetes === 1 ? 'Yes' : profileData.diabetes === 0 ? 'No' : null} />
+                <ProfileField label="Previous Stroke" value={profileData.prevStroke === 1 ? 'Yes' : profileData.prevStroke === 0 ? 'No' : null} />
+                <ProfileField label="Systolic BP" value={profileData.systolicBp ? `${profileData.systolicBp} mmHg` : null} />
+                <ProfileField label="Diastolic BP" value={profileData.diastolicBp ? `${profileData.diastolicBp} mmHg` : null} />
+                <ProfileField label="Cholesterol" value={profileData.cholesterol ? `${profileData.cholesterol} mg/dL` : null} />
+                <ProfileField label="Resting HR" value={profileData.restingHr ? `${profileData.restingHr} bpm` : null} />
+              </ProfileInfoCard>
+
+              {/* Lifestyle & Medical */}
+              <ProfileInfoCard icon={Activity} title="Lifestyle & Medical History">
+                <ProfileField label="Family History" value={profileData.familyHistory?.length > 0 ? profileData.familyHistory.join(', ') : 'None reported'} />
+                {profileData.medicalData && (
+                  <>
+                    <ProfileField label="Medications" value={profileData.medicalData.medications} />
+                    <ProfileField label="Allergies" value={profileData.medicalData.allergies} />
+                    <ProfileField label="Conditions" value={profileData.medicalData.conditions} />
+                    <ProfileField label="Last Checkup" value={profileData.medicalData.lastCheckup} />
+                  </>
+                )}
+              </ProfileInfoCard>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ── Questionnaire Mode (original flow) ─────────────────
   return (
     <main className="bg-background min-h-screen">
       <Navbar />

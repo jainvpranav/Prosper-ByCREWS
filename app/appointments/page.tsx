@@ -65,7 +65,7 @@ export default function AppointmentsPage() {
   const { user, loading: authLoading } = useAuth();
   const [locations, setLocations] = useState<LocationData[]>(fallbackLocations);
   const [selectedLocation, setSelectedLocation] = useState<LocationData>(fallbackLocations[0]);
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 2)); // March 2025
+  const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);

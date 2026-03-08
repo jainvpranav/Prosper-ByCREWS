@@ -121,6 +121,29 @@ export interface FullProfile {
     conditions: string | null;    // decrypted
     lastCheckup: string | null;
   } | null;
+  // Shortcut alias
+  medicalData: FullProfile['medical'];
+  medications: string | null;
+  allergies: string | null;
+  conditions: string | null;
+  lastCheckup: string | null;
+  // Physical measurements (user_profiles)
+  heightCm: number | null;
+  weightKg: number | null;
+  bmi: number | null;
+  skinType: number | null;
+  // Health questionnaire fields
+  smoker: number | null;
+  cigsperday: number | null;
+  hypertension: number | null;
+  bpMedication: number | null;
+  diabetes: number | null;
+  prevStroke: number | null;
+  systolicBp: number | null;
+  diastolicBp: number | null;
+  cholesterol: number | null;
+  glucose: number | null;
+  restingHr: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,17 +349,17 @@ export async function getProfileByUser(
 ): Promise<FullProfile | null> {
   const supabase = getSupabase();
 
-  // Fetch base profile
+  // Fetch base profile (including Q3/Q4 physical fields)
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
-    .select('profile_id, age, gender, activity_level, city, profile_complete')
+    .select('profile_id, age, gender, activity_level, city, profile_complete, height_cm, weight_kg, bmi, skin_type')
     .eq('user_id', userId)
     .single();
 
   if (profileError || !profile) return null;
 
-  // Fetch sub-tables in parallel
-  const [fhResult, lsResult, dietResult, medResult] = await Promise.all([
+  // Fetch sub-tables in parallel (including health_questionnaire)
+  const [fhResult, lsResult, dietResult, medResult, hqResult] = await Promise.all([
     supabase
       .from('family_history')
       .select('condition')
@@ -359,10 +382,17 @@ export async function getProfileByUser(
       .select('medications_enc, allergies_enc, conditions_enc, last_checkup')
       .eq('profile_id', profile.profile_id)
       .single(),
+
+    supabase
+      .from('health_questionnaire')
+      .select('smoker, cigsperday, hypertension, bp_medication, diabetes, prev_stroke, systolic_bp, diastolic_bp, cholesterol, glucose, resting_hr')
+      .eq('user_id', userId)
+      .single(),
   ]);
 
   // Decrypt PHI fields
   const med = medResult.data ?? null;
+  const hq = hqResult.data ?? null;
 
   // Log the access
   await logAccess({
@@ -372,6 +402,15 @@ export async function getProfileByUser(
     ipAddress: options?.ipAddress,
     purpose: options?.purpose ?? 'Treatment',
   });
+
+  const medicalObj = med
+    ? {
+        medications: decryptPHI(med.medications_enc),
+        allergies: decryptPHI(med.allergies_enc),
+        conditions: decryptPHI(med.conditions_enc),
+        lastCheckup: med.last_checkup,
+      }
+    : null;
 
   return {
     profileId: profile.profile_id,
@@ -395,13 +434,28 @@ export async function getProfileByUser(
           dietQuality: dietResult.data.diet_quality,
         }
       : null,
-    medical: med
-      ? {
-          medications: decryptPHI(med.medications_enc),
-          allergies: decryptPHI(med.allergies_enc),
-          conditions: decryptPHI(med.conditions_enc),
-          lastCheckup: med.last_checkup,
-        }
-      : null,
+    medical: medicalObj,
+    medicalData: medicalObj,
+    medications: medicalObj?.medications ?? null,
+    allergies: medicalObj?.allergies ?? null,
+    conditions: medicalObj?.conditions ?? null,
+    lastCheckup: medicalObj?.lastCheckup ?? null,
+    // Physical measurements
+    heightCm: profile.height_cm ?? null,
+    weightKg: profile.weight_kg ?? null,
+    bmi: profile.bmi ?? null,
+    skinType: profile.skin_type ?? null,
+    // Health questionnaire
+    smoker: hq?.smoker ?? null,
+    cigsperday: hq?.cigsperday ?? null,
+    hypertension: hq?.hypertension ?? null,
+    bpMedication: hq?.bp_medication ?? null,
+    diabetes: hq?.diabetes ?? null,
+    prevStroke: hq?.prev_stroke ?? null,
+    systolicBp: hq?.systolic_bp ?? null,
+    diastolicBp: hq?.diastolic_bp ?? null,
+    cholesterol: hq?.cholesterol ?? null,
+    glucose: hq?.glucose ?? null,
+    restingHr: hq?.resting_hr ?? null,
   };
 }
