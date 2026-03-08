@@ -6,6 +6,7 @@ import { MascotMini } from './Mascot';
 import { usePathname } from 'next/navigation';
 import { sendChatMessage } from '@/lib/chatService';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -150,10 +151,32 @@ export function FloatingChat() {
                     className={`max-w-xs px-4 py-2 rounded-lg text-sm ${
                       message.sender === 'user'
                         ? 'bg-primary text-primary-foreground rounded-br-none'
-                        : 'bg-muted text-foreground rounded-bl-none'
+                        : 'bg-muted text-foreground rounded-bl-none prose-chat'
                     }`}
                   >
-                    {message.text}
+                    {message.sender === 'ai' ? (
+                      <ReactMarkdown
+                        components={{
+                          h1: ({ children }) => <h1 className="text-base font-bold mb-1 mt-2 first:mt-0">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-sm font-bold mb-1 mt-2 first:mt-0">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-1 first:mt-0">{children}</h3>,
+                          p: ({ children }) => <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                          code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                          pre: ({ children }) => <pre className="bg-black/10 dark:bg-white/10 p-2 rounded text-xs font-mono overflow-x-auto mb-1">{children}</pre>,
+                          hr: () => <hr className="border-t border-current opacity-20 my-2" />,
+                          blockquote: ({ children }) => <blockquote className="border-l-2 border-current pl-2 opacity-80 italic my-1">{children}</blockquote>,
+                        }}
+                      >
+                        {message.text}
+                      </ReactMarkdown>
+                    ) : (
+                      message.text
+                    )}
                   </div>
                 </div>
               ))}

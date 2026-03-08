@@ -131,7 +131,7 @@ python src/evaluate.py
 ### Step 7 — Start local inference server
 
 ```bash
-uvicorn src.serve:app --reload --port 8000
+uvicorn src.server:app --reload --port 8000
 ```
 
 **Test the endpoint:**

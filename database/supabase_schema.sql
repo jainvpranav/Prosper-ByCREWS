@@ -47,16 +47,22 @@ create index if not exists ix_users_email on public.users (email) where is_activ
 -- TABLE: public.user_profiles
 -- =============================================================================
 create table if not exists public.user_profiles (
-    profile_id      uuid            primary key default gen_random_uuid(),
-    user_id         uuid            not null references public.users(user_id),
-    age             smallint        null check (age >= 0 and age <= 150),
-    gender          varchar(50)     null,
-    activity_level  varchar(50)     null,
-    city            varchar(200)    null,
-    profile_complete boolean        not null default false,
-    created_at      timestamptz     not null default now(),
-    modified_at     timestamptz     not null default now(),
-    
+    profile_id       uuid            primary key default gen_random_uuid(),
+    user_id          uuid            not null references public.users(user_id),
+    age              smallint        null check (age >= 0 and age <= 150),
+    gender           varchar(50)     null,
+    activity_level   varchar(50)     null,
+    city             varchar(200)    null,
+    profile_complete boolean         not null default false,
+    -- Q3 — physical measurements (used to compute BMI)
+    height_cm        smallint        null check (height_cm between 80 and 250),
+    weight_kg        numeric(5,1)    null check (weight_kg between 20 and 300),
+    bmi              numeric(4,1)    null check (bmi between 5 and 100),
+    -- Q4 — Fitzpatrick skin phototype (1=Very fair … 6=Dark)
+    skin_type        smallint        null check (skin_type between 1 and 6),
+    created_at       timestamptz     not null default now(),
+    modified_at      timestamptz     not null default now(),
+
     constraint uq_user_profiles_user_id unique (user_id)
 );
 
@@ -121,6 +127,78 @@ create table if not exists public.medical_data (
 
     constraint uq_medical_data_profile_id unique (profile_id)
 );
+
+-- =============================================================================
+-- TABLE: public.health_questionnaire
+-- One row per user. Stores all answers from Q5–Q17 of the health onboarding
+-- assessment, mirroring the exact payloads sent to /predict and /cancer/all.
+-- =============================================================================
+create table if not exists public.health_questionnaire (
+    questionnaire_id     uuid            primary key default gen_random_uuid(),
+    user_id              uuid            not null references public.users(user_id) on delete cascade,
+
+    -- SECTION 2 — HEART HEALTH (Q5–Q9) → /predict
+    smoker               smallint        null check (smoker in (0, 1)),
+    cigsperday           smallint        null check (cigsperday >= 0),
+    hypertension         smallint        null check (hypertension in (0, 1)),
+    bp_medication        smallint        null check (bp_medication in (0, 1)),
+    diabetes             smallint        null check (diabetes in (0, 1)),
+    prev_stroke          smallint        null check (prev_stroke in (0, 1)),
+    bp_knowledge         varchar(10)     null check (bp_knowledge in ('yes', 'no', 'unknown')),
+    systolic_bp          smallint        null check (systolic_bp between 60 and 250),
+    diastolic_bp         smallint        null check (diastolic_bp between 40 and 150),
+    cholesterol          smallint        null check (cholesterol between 50 and 600),
+    glucose              smallint        null check (glucose between 40 and 500),
+    resting_hr           smallint        null check (resting_hr between 30 and 220),
+
+    -- SECTION 3 — CANCER SHARED (Q10–Q14) → /cancer/all
+    uv_exposure_high          boolean    not null default false,
+    sunburn_history           boolean    not null default false,
+    geography_high_uv         boolean    not null default false,
+    family_history_breast     boolean    not null default false,
+    family_history_ovarian    boolean    not null default false,
+    family_history_prostate   boolean    not null default false,
+    family_history_skin       boolean    not null default false,
+    family_history_blood      boolean    not null default false,
+    family_history_brca2      boolean    not null default false,
+    prior_chemotherapy        boolean    not null default false,
+    prior_radiation           boolean    not null default false,
+    prior_skin_cancer         boolean    not null default false,
+    immunosuppressed          boolean    not null default false,
+    persistent_fatigue        boolean    not null default false,
+    unexplained_weight_loss   boolean    not null default false,
+    night_sweats              boolean    not null default false,
+    frequent_infections       boolean    not null default false,
+    easy_bruising_bleeding    boolean    not null default false,
+    swollen_lymph_nodes       boolean    not null default false,
+
+    -- SECTION 4A — FEMALE ONLY (F_Q15–F_Q17)
+    brca_known           boolean         null,
+    menopause            boolean         null,
+    hrt_use              boolean         null,
+
+    -- SECTION 4B — MALE ONLY (M_Q15–M_Q17)
+    race_high_risk       boolean         null,
+    urinary_symptoms     boolean         null,
+    diet_high_red_meat   boolean         null,
+    psa_known            numeric(6,2)    null check (psa_known >= 0),
+
+    -- SHARED LIFESTYLE (Q17)
+    alcohol_weekly_units smallint        null check (alcohol_weekly_units >= 0),
+    activity_choice      varchar(20)     null check (activity_choice in ('active', 'somewhat', 'low', 'sedentary')),
+
+    -- DERIVED (computed by app layer)
+    physical_activity_low boolean        null,
+    obesity               boolean        null,
+
+    completed_at         timestamptz     not null default now(),
+    modified_at          timestamptz     not null default now(),
+
+    constraint uq_health_questionnaire_user_id unique (user_id)
+);
+
+create index if not exists ix_health_questionnaire_user_id
+    on public.health_questionnaire (user_id);
 
 -- =============================================================================
 -- TABLE: public.risk_assessments
@@ -256,6 +334,7 @@ alter table public.risk_assessments enable row level security;
 alter table public.risk_factor_contributions enable row level security;
 alter table public.health_projections enable row level security;
 alter table public.appointments enable row level security;
+alter table public.health_questionnaire enable row level security;
 alter table public.chat_messages enable row level security;
 alter table audit.audit_log enable row level security;
 alter table audit.data_access_log enable row level security;
@@ -273,6 +352,7 @@ create policy "Allow all for service role" on public.risk_assessments for all us
 create policy "Allow all for service role" on public.risk_factor_contributions for all using (true) with check (true);
 create policy "Allow all for service role" on public.health_projections for all using (true) with check (true);
 create policy "Allow all for service role" on public.appointments for all using (true) with check (true);
+create policy "Allow all for service role" on public.health_questionnaire for all using (true) with check (true);
 create policy "Allow all for service role" on public.chat_messages for all using (true) with check (true);
 create policy "Allow all for service role" on audit.audit_log for all using (true) with check (true);
 create policy "Allow all for service role" on audit.data_access_log for all using (true) with check (true);

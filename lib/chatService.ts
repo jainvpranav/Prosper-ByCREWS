@@ -5,7 +5,8 @@ export async function sendChatMessage(message: string) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message }),
+      // Lambda reads event.get("inputText"), so we send it under that key
+      body: JSON.stringify({ inputText: message }),
     });
 
     if (!response.ok) {
@@ -14,10 +15,10 @@ export async function sendChatMessage(message: string) {
     }
 
     const data = await response.json();
-    
-    // API Gateway response might be wrapped or simple
-    // Based on the curl test it returns {"message": ...}
-    return data.message || data.response || "I'm sorry, I couldn't process that.";
+
+    // Lambda returns { response, sessionId } inside body (may be double-JSON-encoded by API GW)
+    const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+    return parsed.response || parsed.message || "I'm sorry, I couldn't process that.";
   } catch (error: any) {
     console.error('Chat Service Error:', error);
     throw error;

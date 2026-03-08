@@ -34,6 +34,8 @@ export interface RiskAssessmentInput {
   lifestyleImpact?: string;      // 'Low' | 'Moderate' | 'Critical'
   medicalHistoryRisk?: string;   // 'Low Risk' | 'Moderate' | 'High'
   aiInsightSummary?: string;
+  cardioResult?: any;            // Full ML JSON from /predict
+  cancerResults?: any;           // Full ML JSON from /cancer/all
   riskFactors?: RiskFactorInput[];
   projections?: ProjectionPoint[];
 }
@@ -65,6 +67,8 @@ export async function saveRiskAssessment(
       lifestyle_impact: data.lifestyleImpact ?? null,
       medical_history_risk: data.medicalHistoryRisk ?? null,
       ai_insight_summary: data.aiInsightSummary ?? null,
+      cardio_result: data.cardioResult ?? null,
+      cancer_results: data.cancerResults ?? null,
     })
     .select('assessment_id')
     .single();
@@ -133,13 +137,18 @@ export async function getLatestAssessment(
   // Fetch latest assessment
   const { data: assessment, error: assessmentError } = await supabase
     .from('risk_assessments')
-    .select('assessment_id, overall_risk_score, genetic_disposition, lifestyle_impact, medical_history_risk, ai_insight_summary, assessed_at')
+    .select('assessment_id, overall_risk_score, genetic_disposition, lifestyle_impact, medical_history_risk, ai_insight_summary, cardio_result, cancer_results, assessed_at')
     .eq('user_id', userId)
     .order('assessed_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (assessmentError || !assessment) return null;
+  if (assessmentError || !assessment) {
+    if (assessmentError) {
+      console.error('[RiskAssessmentService] getLatestAssessment error:', assessmentError.code, assessmentError.message);
+    }
+    return null;
+  }
 
   // Fetch factors + projections in parallel
   const [factorsResult, projectionsResult] = await Promise.all([
@@ -171,6 +180,8 @@ export async function getLatestAssessment(
     lifestyleImpact: assessment.lifestyle_impact,
     medicalHistoryRisk: assessment.medical_history_risk,
     aiInsightSummary: assessment.ai_insight_summary,
+    cardioResult: assessment.cardio_result,
+    cancerResults: assessment.cancer_results,
     assessedAt: assessment.assessed_at,
     riskFactors: (factorsResult.data ?? []).map((f) => ({
       factorName: f.factor_name,

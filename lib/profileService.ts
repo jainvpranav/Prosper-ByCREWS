@@ -1,6 +1,7 @@
 /**
  * lib/profileService.ts
  * CRUD for user_profiles and all sub-tables (family_history, lifestyle_data, diet_data, medical_data)
+ * Also writes health_questionnaire (Q5–Q17) and the Q3/Q4 fields on user_profiles.
  *
  * HIPAA Notes:
  *  - MedicalData fields (Medications, Allergies, Conditions) are encrypted
@@ -40,6 +41,67 @@ export interface ProfileInput {
   allergies: string;
   conditions: string;
   lastCheckup: string;
+
+  // ── Q3 / Q4 — physical measurements & skin type (new schema fields) ──────
+  heightCm?: number | null;
+  weightKg?: number | null;
+  bmi?: number | null;
+  skinType?: number | null;
+
+  // ── Q5–Q17 — health questionnaire answers ────────────────────────────────
+  // Heart health (Q5–Q9)
+  smoker?: 0 | 1 | null;
+  cigsperday?: number | null;
+  hypertension?: 0 | 1 | null;
+  bpMedication?: 0 | 1 | null;
+  diabetes?: 0 | 1 | null;
+  prevStroke?: 0 | 1 | null;
+  bpKnowledge?: 'yes' | 'no' | 'unknown' | null;
+  systolicBp?: number | null;
+  diastolicBp?: number | null;
+  cholesterol?: number | null;
+  glucose?: number | null;
+  restingHr?: number | null;
+
+  // Cancer shared (Q10–Q14)
+  uvExposureHigh?: boolean;
+  sunburnHistory?: boolean;
+  geographyHighUv?: boolean;
+  familyHistoryBreast?: boolean;
+  familyHistoryOvarian?: boolean;
+  familyHistoryProstate?: boolean;
+  familyHistorySkin?: boolean;
+  familyHistoryBlood?: boolean;
+  familyHistoryBrca2?: boolean;
+  priorChemotherapy?: boolean;
+  priorRadiation?: boolean;
+  priorSkinCancer?: boolean;
+  immunosuppressed?: boolean;
+  persistentFatigue?: boolean;
+  unexplainedWeightLoss?: boolean;
+  nightSweats?: boolean;
+  frequentInfections?: boolean;
+  easyBruisingBleeding?: boolean;
+  swollenLymphNodes?: boolean;
+
+  // Female only (F_Q15–F_Q17)
+  brcaKnown?: boolean | null;
+  menopause?: boolean | null;
+  hrtUse?: boolean | null;
+
+  // Male only (M_Q15–M_Q17)
+  raceHighRisk?: boolean | null;
+  urinarySymptoms?: boolean | null;
+  dietHighRedMeat?: boolean | null;
+  psaKnown?: number | null;
+
+  // Shared lifestyle (F_Q17 / M_Q17)
+  alcoholWeeklyUnits?: number | null;
+  activityChoice?: 'active' | 'somewhat' | 'low' | 'sedentary' | null;
+
+  // Derived
+  physicalActivityLow?: boolean | null;
+  obesity?: boolean | null;
 }
 
 export interface FullProfile {
@@ -73,8 +135,7 @@ export async function upsertProfile(
 ): Promise<string> {
   const supabase = getSupabase();
 
-  // 1. Upsert UserProfiles (core row)
-  // Sanitize age: form may send empty string which PostgreSQL rejects for smallint
+  // 1. Upsert UserProfiles (core row) — now includes Q3/Q4 physical fields
   const sanitizedAge = (data.age === '' || data.age === undefined || data.age === null)
     ? null
     : typeof data.age === 'string' ? parseInt(data.age, 10) || null : data.age;
@@ -90,6 +151,11 @@ export async function upsertProfile(
         city: data.city || null,
         profile_complete: true,
         modified_at: new Date().toISOString(),
+        // Q3 / Q4 — new schema columns
+        height_cm: data.heightCm ?? null,
+        weight_kg: data.weightKg ?? null,
+        bmi: data.bmi ?? null,
+        skin_type: data.skinType ?? null,
       },
       { onConflict: 'user_id' }
     )
@@ -157,6 +223,86 @@ export async function upsertProfile(
       },
       { onConflict: 'profile_id' }
     );
+
+  // 6. Upsert HealthQuestionnaire — Q5–Q17 answers (new table from migration)
+  // Only write this row when at least one questionnaire answer has been provided
+  const hasQuestionnaireData =
+    data.smoker !== undefined ||
+    data.hypertension !== undefined ||
+    data.uvExposureHigh !== undefined;
+
+  if (hasQuestionnaireData) {
+    const { error: qError } = await supabase
+      .from('health_questionnaire')
+      .upsert(
+        {
+          user_id: userId,
+          // Q5 — smoking
+          smoker: data.smoker ?? null,
+          cigsperday: data.cigsperday ?? null,
+          // Q6 — hypertension
+          hypertension: data.hypertension ?? null,
+          bp_medication: data.bpMedication ?? null,
+          // Q7 — conditions
+          diabetes: data.diabetes ?? null,
+          prev_stroke: data.prevStroke ?? null,
+          // Q8 — blood pressure
+          bp_knowledge: data.bpKnowledge ?? null,
+          systolic_bp: data.systolicBp ?? null,
+          diastolic_bp: data.diastolicBp ?? null,
+          // Q9 — blood tests
+          cholesterol: data.cholesterol ?? null,
+          glucose: data.glucose ?? null,
+          resting_hr: data.restingHr ?? null,
+          // Q10 — sun/UV
+          uv_exposure_high: data.uvExposureHigh ?? false,
+          sunburn_history: data.sunburnHistory ?? false,
+          geography_high_uv: data.geographyHighUv ?? false,
+          // Q11 — family cancer history
+          family_history_breast: data.familyHistoryBreast ?? false,
+          family_history_ovarian: data.familyHistoryOvarian ?? false,
+          family_history_prostate: data.familyHistoryProstate ?? false,
+          family_history_skin: data.familyHistorySkin ?? false,
+          family_history_blood: data.familyHistoryBlood ?? false,
+          family_history_brca2: data.familyHistoryBrca2 ?? false,
+          // Q12 — prior medical
+          prior_chemotherapy: data.priorChemotherapy ?? false,
+          prior_radiation: data.priorRadiation ?? false,
+          prior_skin_cancer: data.priorSkinCancer ?? false,
+          immunosuppressed: data.immunosuppressed ?? false,
+          // Q13
+          persistent_fatigue: data.persistentFatigue ?? false,
+          unexplained_weight_loss: data.unexplainedWeightLoss ?? false,
+          night_sweats: data.nightSweats ?? false,
+          // Q14
+          frequent_infections: data.frequentInfections ?? false,
+          easy_bruising_bleeding: data.easyBruisingBleeding ?? false,
+          swollen_lymph_nodes: data.swollenLymphNodes ?? false,
+          // Female only
+          brca_known: data.brcaKnown ?? null,
+          menopause: data.menopause ?? null,
+          hrt_use: data.hrtUse ?? null,
+          // Male only
+          race_high_risk: data.raceHighRisk ?? null,
+          urinary_symptoms: data.urinarySymptoms ?? null,
+          diet_high_red_meat: data.dietHighRedMeat ?? null,
+          psa_known: data.psaKnown ?? null,
+          // Shared lifestyle
+          alcohol_weekly_units: data.alcoholWeeklyUnits ?? null,
+          activity_choice: data.activityChoice ?? null,
+          // Derived
+          physical_activity_low: data.physicalActivityLow ?? null,
+          obesity: data.obesity ?? null,
+          modified_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+
+    if (qError) {
+      console.error('[ProfileService] Failed to upsert health_questionnaire:', qError.message);
+      // Non-fatal — profile still saved successfully
+    }
+  }
 
   await logChange({
     tableName: 'user_profiles',
