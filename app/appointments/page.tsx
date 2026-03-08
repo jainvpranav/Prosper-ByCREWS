@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import {
@@ -10,8 +12,7 @@ import {
 import { toast } from 'sonner';
 import type { Appointment } from '@/lib/appointmentsService';
 
-// TODO: Replace with real session user ID once auth is wired
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 
 const locations = [
   {
@@ -43,6 +44,8 @@ const timeSlots = {
 };
 
 export default function AppointmentsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [selectedLocation, setSelectedLocation] = useState(locations[0]);
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 2)); // March 2025
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -56,9 +59,14 @@ export default function AppointmentsPage() {
   const [loadingPast, setLoadingPast] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && !user) router.push('/login');
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
     async function loadAppointments() {
       try {
-        const res = await fetch(`/api/appointments?userId=${DEMO_USER_ID}`);
+        const res = await fetch(`/api/appointments?userId=${user!.userId}`);
         if (res.ok) {
           const data = await res.json();
           setPastAppointments(data.appointments ?? []);
@@ -70,7 +78,7 @@ export default function AppointmentsPage() {
       }
     }
     loadAppointments();
-  }, []);
+  }, [user]);
 
   const getDaysInMonth = (date: Date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -100,7 +108,7 @@ export default function AppointmentsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: DEMO_USER_ID,
+          userId: user!.userId,
           locationName: selectedLocation.name,
           appointmentDate,
           timeSlot: selectedSlot,

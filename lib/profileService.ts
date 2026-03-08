@@ -1,16 +1,18 @@
 /**
  * lib/profileService.ts
- * CRUD for UserProfiles and all sub-tables (FamilyHistory, LifestyleData, DietData, MedicalData)
+ * CRUD for user_profiles and all sub-tables (family_history, lifestyle_data, diet_data, medical_data)
  *
  * HIPAA Notes:
  *  - MedicalData fields (Medications, Allergies, Conditions) are encrypted
  *    with AES-256-GCM via lib/phi.ts before INSERT/UPDATE
- *  - Decryption happens only here, in the application layer — never in SQL
+ *  - Decryption happens only here, in the application layer — never in the database
  *  - All mutations are audit-logged via lib/auditLogger.ts
  *  - Access reads are logged (logAccess) for §164.312(b) compliance
+ *
+ * Migrated from SQL Server (mssql) → Supabase (PostgreSQL).
  */
 
-import { getPool, sql } from './db';
+import { getSupabase } from './supabase';
 import { encryptPHI, decryptPHI } from './phi';
 import { logChange, logAccess } from './auditLogger';
 
@@ -20,7 +22,7 @@ import { logChange, logAccess } from './auditLogger';
 
 export interface ProfileInput {
   // Basics
-  age: number;
+  age: number | string;  // form may send empty string
   gender: string;
   activityLevel: string;
   city: string;
@@ -69,116 +71,103 @@ export async function upsertProfile(
   data: ProfileInput,
   options?: { ipAddress?: string }
 ): Promise<string> {
-  const pool = await getPool();
-  const transaction = new sql.Transaction(pool);
-  await transaction.begin();
+  const supabase = getSupabase();
 
-  try {
-    // 1. Upsert UserProfiles (core row)
-    const profileResult = await new sql.Request(transaction)
-      .input('UserId', sql.UniqueIdentifier, userId)
-      .input('Age', sql.TinyInt, data.age)
-      .input('Gender', sql.NVarChar(50), data.gender)
-      .input('ActivityLevel', sql.NVarChar(50), data.activityLevel)
-      .input('City', sql.NVarChar(200), data.city)
-      .query<{ profileId: string }>(`
-        MERGE dbo.UserProfiles AS target
-        USING (SELECT @UserId AS UserId) AS source ON target.UserId = source.UserId
-        WHEN MATCHED THEN
-          UPDATE SET Age = @Age, Gender = @Gender, ActivityLevel = @ActivityLevel,
-                     City = @City, ProfileComplete = 1, ModifiedAt = SYSDATETIMEOFFSET()
-        WHEN NOT MATCHED THEN
-          INSERT (UserId, Age, Gender, ActivityLevel, City, ProfileComplete)
-          VALUES (@UserId, @Age, @Gender, @ActivityLevel, @City, 1)
-        OUTPUT INSERTED.ProfileId AS profileId;
-      `);
+  // 1. Upsert UserProfiles (core row)
+  // Sanitize age: form may send empty string which PostgreSQL rejects for smallint
+  const sanitizedAge = (data.age === '' || data.age === undefined || data.age === null)
+    ? null
+    : typeof data.age === 'string' ? parseInt(data.age, 10) || null : data.age;
 
-    const profileId = profileResult.recordset[0].profileId;
+  const { data: profileRow, error: profileError } = await supabase
+    .from('user_profiles')
+    .upsert(
+      {
+        user_id: userId,
+        age: sanitizedAge,
+        gender: data.gender || null,
+        activity_level: data.activityLevel || null,
+        city: data.city || null,
+        profile_complete: true,
+        modified_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+    .select('profile_id')
+    .single();
 
-    // 2. Replace FamilyHistory (delete + re-insert)
-    await new sql.Request(transaction)
-      .input('ProfileId', sql.UniqueIdentifier, profileId)
-      .query(`DELETE FROM dbo.FamilyHistory WHERE ProfileId = @ProfileId`);
-
-    for (const condition of data.familyHistory) {
-      await new sql.Request(transaction)
-        .input('ProfileId', sql.UniqueIdentifier, profileId)
-        .input('Condition', sql.NVarChar(200), condition)
-        .query(`INSERT INTO dbo.FamilyHistory (ProfileId, Condition) VALUES (@ProfileId, @Condition)`);
-    }
-
-    // 3. Upsert LifestyleData
-    await new sql.Request(transaction)
-      .input('ProfileId', sql.UniqueIdentifier, profileId)
-      .input('SmokingStatus', sql.NVarChar(50), data.smoking)
-      .input('AlcoholUse', sql.NVarChar(50), data.alcohol)
-      .input('SleepRange', sql.NVarChar(20), data.sleep)
-      .query(`
-        MERGE dbo.LifestyleData AS target
-        USING (SELECT @ProfileId AS ProfileId) AS source ON target.ProfileId = source.ProfileId
-        WHEN MATCHED THEN
-          UPDATE SET SmokingStatus = @SmokingStatus, AlcoholUse = @AlcoholUse,
-                     SleepRange = @SleepRange, ModifiedAt = SYSDATETIMEOFFSET()
-        WHEN NOT MATCHED THEN
-          INSERT (ProfileId, SmokingStatus, AlcoholUse, SleepRange)
-          VALUES (@ProfileId, @SmokingStatus, @AlcoholUse, @SleepRange);
-      `);
-
-    // 4. Upsert DietData
-    await new sql.Request(transaction)
-      .input('ProfileId', sql.UniqueIdentifier, profileId)
-      .input('FoodPreference', sql.NVarChar(100), data.foodPreference)
-      .input('DietQuality', sql.NVarChar(50), data.dietQuality)
-      .query(`
-        MERGE dbo.DietData AS target
-        USING (SELECT @ProfileId AS ProfileId) AS source ON target.ProfileId = source.ProfileId
-        WHEN MATCHED THEN
-          UPDATE SET FoodPreference = @FoodPreference, DietQuality = @DietQuality,
-                     ModifiedAt = SYSDATETIMEOFFSET()
-        WHEN NOT MATCHED THEN
-          INSERT (ProfileId, FoodPreference, DietQuality)
-          VALUES (@ProfileId, @FoodPreference, @DietQuality);
-      `);
-
-    // 5. Upsert MedicalData — encrypt PHI fields before storing
-    const encMedications = encryptPHI(data.medications);
-    const encAllergies   = encryptPHI(data.allergies);
-    const encConditions  = encryptPHI(data.conditions);
-
-    await new sql.Request(transaction)
-      .input('ProfileId', sql.UniqueIdentifier, profileId)
-      .input('Medications_Enc', sql.NVarChar(sql.MAX), encMedications)
-      .input('Allergies_Enc',   sql.NVarChar(sql.MAX), encAllergies)
-      .input('Conditions_Enc',  sql.NVarChar(sql.MAX), encConditions)
-      .input('LastCheckup',     sql.NVarChar(50), data.lastCheckup)
-      .query(`
-        MERGE dbo.MedicalData AS target
-        USING (SELECT @ProfileId AS ProfileId) AS source ON target.ProfileId = source.ProfileId
-        WHEN MATCHED THEN
-          UPDATE SET Medications_Enc = @Medications_Enc, Allergies_Enc = @Allergies_Enc,
-                     Conditions_Enc = @Conditions_Enc, LastCheckup = @LastCheckup,
-                     ModifiedAt = SYSDATETIMEOFFSET()
-        WHEN NOT MATCHED THEN
-          INSERT (ProfileId, Medications_Enc, Allergies_Enc, Conditions_Enc, LastCheckup)
-          VALUES (@ProfileId, @Medications_Enc, @Allergies_Enc, @Conditions_Enc, @LastCheckup);
-      `);
-
-    await transaction.commit();
-
-    await logChange({
-      tableName: 'dbo.UserProfiles',
-      recordId: profileId,
-      operation: 'UPDATE',
-      changedByUserId: userId,
-      newValues: { age: data.age, gender: data.gender, activityLevel: data.activityLevel, city: data.city },
-      ipAddress: options?.ipAddress,
-    });
-
-    return profileId;
-  } catch (err) {
-    await transaction.rollback();
-    throw err;
+  if (profileError || !profileRow) {
+    throw new Error(`[ProfileService] Failed to upsert profile: ${profileError?.message}`);
   }
+
+  const profileId = profileRow.profile_id;
+
+  // 2. Replace FamilyHistory (delete + re-insert)
+  await supabase.from('family_history').delete().eq('profile_id', profileId);
+  if (data.familyHistory.length > 0) {
+    const familyRows = data.familyHistory.map((condition) => ({
+      profile_id: profileId,
+      condition,
+    }));
+    await supabase.from('family_history').insert(familyRows);
+  }
+
+  // 3. Upsert LifestyleData
+  await supabase
+    .from('lifestyle_data')
+    .upsert(
+      {
+        profile_id: profileId,
+        smoking_status: data.smoking,
+        alcohol_use: data.alcohol,
+        sleep_range: data.sleep,
+        modified_at: new Date().toISOString(),
+      },
+      { onConflict: 'profile_id' }
+    );
+
+  // 4. Upsert DietData
+  await supabase
+    .from('diet_data')
+    .upsert(
+      {
+        profile_id: profileId,
+        food_preference: data.foodPreference,
+        diet_quality: data.dietQuality,
+        modified_at: new Date().toISOString(),
+      },
+      { onConflict: 'profile_id' }
+    );
+
+  // 5. Upsert MedicalData — encrypt PHI fields before storing
+  const encMedications = encryptPHI(data.medications);
+  const encAllergies = encryptPHI(data.allergies);
+  const encConditions = encryptPHI(data.conditions);
+
+  await supabase
+    .from('medical_data')
+    .upsert(
+      {
+        profile_id: profileId,
+        medications_enc: encMedications,
+        allergies_enc: encAllergies,
+        conditions_enc: encConditions,
+        last_checkup: data.lastCheckup,
+        modified_at: new Date().toISOString(),
+      },
+      { onConflict: 'profile_id' }
+    );
+
+  await logChange({
+    tableName: 'user_profiles',
+    recordId: profileId,
+    operation: 'UPDATE',
+    changedByUserId: userId,
+    newValues: { age: data.age, gender: data.gender, activityLevel: data.activityLevel, city: data.city },
+    ipAddress: options?.ipAddress,
+  });
+
+  return profileId;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,72 +178,83 @@ export async function getProfileByUser(
   userId: string,
   options?: { requestedByUserId?: string; ipAddress?: string; purpose?: string }
 ): Promise<FullProfile | null> {
-  const pool = await getPool();
+  const supabase = getSupabase();
 
   // Fetch base profile
-  const profileResult = await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query<{ profileId: string; age: number; gender: string; activityLevel: string; city: string; profileComplete: boolean }>(`
-      SELECT ProfileId AS profileId, Age AS age, Gender AS gender,
-             ActivityLevel AS activityLevel, City AS city, ProfileComplete AS profileComplete
-      FROM dbo.UserProfiles
-      WHERE UserId = @UserId
-    `);
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('profile_id, age, gender, activity_level, city, profile_complete')
+    .eq('user_id', userId)
+    .single();
 
-  if (!profileResult.recordset[0]) return null;
-  const p = profileResult.recordset[0];
+  if (profileError || !profile) return null;
 
   // Fetch sub-tables in parallel
   const [fhResult, lsResult, dietResult, medResult] = await Promise.all([
-    pool.request().input('ProfileId', sql.UniqueIdentifier, p.profileId)
-      .query<{ condition: string }>(`SELECT Condition AS condition FROM dbo.FamilyHistory WHERE ProfileId = @ProfileId`),
+    supabase
+      .from('family_history')
+      .select('condition')
+      .eq('profile_id', profile.profile_id),
 
-    pool.request().input('ProfileId', sql.UniqueIdentifier, p.profileId)
-      .query<{ smokingStatus: string; alcoholUse: string; sleepRange: string }>(`
-        SELECT SmokingStatus AS smokingStatus, AlcoholUse AS alcoholUse, SleepRange AS sleepRange
-        FROM dbo.LifestyleData WHERE ProfileId = @ProfileId`),
+    supabase
+      .from('lifestyle_data')
+      .select('smoking_status, alcohol_use, sleep_range')
+      .eq('profile_id', profile.profile_id)
+      .single(),
 
-    pool.request().input('ProfileId', sql.UniqueIdentifier, p.profileId)
-      .query<{ foodPreference: string; dietQuality: string }>(`
-        SELECT FoodPreference AS foodPreference, DietQuality AS dietQuality
-        FROM dbo.DietData WHERE ProfileId = @ProfileId`),
+    supabase
+      .from('diet_data')
+      .select('food_preference, diet_quality')
+      .eq('profile_id', profile.profile_id)
+      .single(),
 
-    pool.request().input('ProfileId', sql.UniqueIdentifier, p.profileId)
-      .query<{ medications_Enc: string; allergies_Enc: string; conditions_Enc: string; lastCheckup: string }>(`
-        SELECT Medications_Enc, Allergies_Enc, Conditions_Enc, LastCheckup AS lastCheckup
-        FROM dbo.MedicalData WHERE ProfileId = @ProfileId`),
+    supabase
+      .from('medical_data')
+      .select('medications_enc, allergies_enc, conditions_enc, last_checkup')
+      .eq('profile_id', profile.profile_id)
+      .single(),
   ]);
 
   // Decrypt PHI fields
-  const med = medResult.recordset[0] ?? null;
+  const med = medResult.data ?? null;
 
   // Log the access
   await logAccess({
     accessedByUserId: options?.requestedByUserId ?? userId,
-    tableName: 'dbo.UserProfiles',
-    recordId: p.profileId,
+    tableName: 'user_profiles',
+    recordId: profile.profile_id,
     ipAddress: options?.ipAddress,
     purpose: options?.purpose ?? 'Treatment',
   });
 
   return {
-    profileId: p.profileId,
+    profileId: profile.profile_id,
     userId,
-    age: p.age,
-    gender: p.gender,
-    activityLevel: p.activityLevel,
-    city: p.city,
-    profileComplete: p.profileComplete,
-    familyHistory: fhResult.recordset.map((r) => r.condition),
-    lifestyle: lsResult.recordset[0] ?? null,
-    diet: dietResult.recordset[0] ?? null,
+    age: profile.age,
+    gender: profile.gender,
+    activityLevel: profile.activity_level,
+    city: profile.city,
+    profileComplete: profile.profile_complete,
+    familyHistory: (fhResult.data ?? []).map((r) => r.condition),
+    lifestyle: lsResult.data
+      ? {
+          smokingStatus: lsResult.data.smoking_status,
+          alcoholUse: lsResult.data.alcohol_use,
+          sleepRange: lsResult.data.sleep_range,
+        }
+      : null,
+    diet: dietResult.data
+      ? {
+          foodPreference: dietResult.data.food_preference,
+          dietQuality: dietResult.data.diet_quality,
+        }
+      : null,
     medical: med
       ? {
-          medications: decryptPHI(med.medications_Enc),
-          allergies:   decryptPHI(med.allergies_Enc),
-          conditions:  decryptPHI(med.conditions_Enc),
-          lastCheckup: med.lastCheckup,
+          medications: decryptPHI(med.medications_enc),
+          allergies: decryptPHI(med.allergies_enc),
+          conditions: decryptPHI(med.conditions_enc),
+          lastCheckup: med.last_checkup,
         }
       : null,
   };

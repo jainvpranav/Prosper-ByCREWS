@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import {
@@ -12,8 +14,7 @@ import {
 } from 'lucide-react';
 import type { RiskAssessment } from '@/lib/riskAssessmentService';
 
-// TODO: Replace with real session user ID
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 
 const FALLBACK_PROJECTIONS = [
   { month: 'Month 0', predicted: 82, baseline: 82 },
@@ -33,14 +34,21 @@ const FALLBACK_RISK_FACTORS = [
 ];
 
 export default function RiskAssessmentPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState<RiskAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!authLoading && !user) router.push('/login');
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
     async function loadAssessment() {
       try {
-        const res = await fetch(`/api/risk-assessment?userId=${DEMO_USER_ID}`);
+        const res = await fetch(`/api/risk-assessment?userId=${user!.userId}`);
         if (res.ok) {
           const data = await res.json();
           setAssessment(data.assessment ?? null);
@@ -53,7 +61,7 @@ export default function RiskAssessmentPage() {
       }
     }
     loadAssessment();
-  }, []);
+  }, [user]);
 
   const projectionData = assessment?.projections?.map((p) => ({
     month: `Month ${p.monthOffset}`,

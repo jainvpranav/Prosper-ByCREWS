@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Heart } from 'lucide-react';
+import { Menu, X, Heart, LogOut } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { useAuth } from '@/lib/auth-context';
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { user, logout, loading } = useAuth();
 
   // Determine if we're on app routes or public routes
   const isAppRoute = pathname.startsWith('/dashboard') || 
@@ -64,16 +66,16 @@ export function Navbar() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
 
-            {!isAppRoute && (
+            {!loading && !user && !isAppRoute && (
               <div className="hidden md:flex gap-3">
                 <Link
-                  href="/profile"
+                  href="/login"
                   className="px-4 py-2 rounded-xl text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
                 >
                   Log in
                 </Link>
                 <Link
-                  href="/profile"
+                  href="/register"
                   className="px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
                 >
                   Start Your Journey
@@ -81,10 +83,19 @@ export function Navbar() {
               </div>
             )}
 
-            {isAppRoute && (
-              <button className="hidden md:block px-4 py-2 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors">
-                Log Out
-              </button>
+            {user && (
+              <div className="hidden md:flex items-center gap-3">
+                <span className="text-xs text-muted-foreground max-w-[140px] truncate">
+                  {user.email}
+                </span>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Log Out
+                </button>
+              </div>
             )}
 
             {/* Mobile Menu Button */}
@@ -115,17 +126,17 @@ export function Navbar() {
               </Link>
             ))}
 
-            {!isAppRoute && (
+            {!loading && !user && (
               <div className="border-t border-border pt-3 space-y-2">
                 <Link
-                  href="/profile"
+                  href="/login"
                   className="block px-4 py-2 rounded-lg text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors text-center"
                   onClick={() => setMobileOpen(false)}
                 >
                   Log in
                 </Link>
                 <Link
-                  href="/profile"
+                  href="/register"
                   className="block px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-colors text-center"
                   onClick={() => setMobileOpen(false)}
                 >
@@ -134,9 +145,14 @@ export function Navbar() {
               </div>
             )}
 
-            {isAppRoute && (
-              <div className="border-t border-border pt-3">
-                <button className="w-full px-4 py-2 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors">
+            {user && (
+              <div className="border-t border-border pt-3 space-y-2">
+                <p className="px-4 text-xs text-muted-foreground truncate">{user.email}</p>
+                <button
+                  onClick={() => { logout(); setMobileOpen(false); }}
+                  className="w-full px-4 py-2 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
                   Log Out
                 </button>
               </div>

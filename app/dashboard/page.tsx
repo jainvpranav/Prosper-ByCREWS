@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import {
@@ -15,8 +17,7 @@ import Link from 'next/link';
 import type { RiskAssessment } from '@/lib/riskAssessmentService';
 import type { FullProfile } from '@/lib/profileService';
 
-// TODO: swap with real session user ID once auth is wired (NextAuth / Clerk etc.)
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 
 // ---------------------------------------------------------------------------
 // Fallback static data — shown when DB is not yet connected / no data exists
@@ -39,17 +40,24 @@ const FALLBACK_RISK_FACTORS = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState<RiskAssessment | null>(null);
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!authLoading && !user) router.push('/login');
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
     async function loadData() {
       try {
         const [assessmentRes, profileRes] = await Promise.all([
-          fetch(`/api/risk-assessment?userId=${DEMO_USER_ID}`),
-          fetch(`/api/profile?userId=${DEMO_USER_ID}`),
+          fetch(`/api/risk-assessment?userId=${user!.userId}`),
+          fetch(`/api/profile?userId=${user!.userId}`),
         ]);
 
         if (assessmentRes.ok) {
@@ -68,7 +76,7 @@ export default function DashboardPage() {
       }
     }
     loadData();
-  }, []);
+  }, [user]);
 
   // Build chart data from DB or fallback
   const projectionData = assessment?.projections?.map((p) => ({

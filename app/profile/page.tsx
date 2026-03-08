@@ -1,17 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Lock, Trophy, ArrowRight, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// TODO: Replace with real user ID from session/auth once NextAuth is wired up.
-// e.g.: const { data: session } = useSession(); const userId = session?.user?.id;
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 
 const steps = [
   { name: 'Basics', xp: 15 },
@@ -54,8 +53,13 @@ const mascotMessages = [
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) router.push('/login');
+  }, [authLoading, user, router]);
   const [formData, setFormData] = useState<FormData>({
     age: '',
     gender: '',
@@ -95,7 +99,7 @@ export default function ProfilePage() {
       const res = await fetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: DEMO_USER_ID, ...formData }),
+        body: JSON.stringify({ userId: user!.userId, ...formData }),
       });
       if (!res.ok) {
         const err = await res.json();

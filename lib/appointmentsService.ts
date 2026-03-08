@@ -1,15 +1,17 @@
 /**
  * lib/appointmentsService.ts
- * CRUD for dbo.Appointments
+ * CRUD for public.appointments
  *
  * HIPAA Notes:
  *  - Appointments contain PHI (provider name, date, notes)
  *  - Notes are stored encrypted via encryptPHI
  *  - All mutations are audit-logged
- *  - Records are soft-deleted (IsActive = 0), never hard-deleted without usp_PurgeUserPHI
+ *  - Records are soft-deleted (is_active = false), never hard-deleted
+ *
+ * Migrated from SQL Server (mssql) → Supabase (PostgreSQL).
  */
 
-import { getPool, sql } from './db';
+import { getSupabase } from './supabase';
 import { encryptPHI, decryptPHI } from './phi';
 import { logChange, logAccess } from './auditLogger';
 
@@ -36,7 +38,7 @@ export interface Appointment {
   provider: string | null;
   appointmentStatus: 'Scheduled' | 'Completed' | 'Cancelled' | 'No-Show';
   notes: string | null;     // decrypted
-  createdAt: Date;
+  createdAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,59 +50,51 @@ export async function createAppointment(
   data: AppointmentInput,
   options?: { ipAddress?: string }
 ): Promise<Appointment> {
-  const pool = await getPool();
+  const supabase = getSupabase();
   const encNotes = encryptPHI(data.notes ?? null);
 
-  const result = await pool
-    .request()
-    .input('UserId',          sql.UniqueIdentifier, userId)
-    .input('LocationName',    sql.NVarChar(300), data.locationName)
-    .input('LocationAddress', sql.NVarChar(500), data.locationAddress ?? null)
-    .input('AppointmentDate', sql.Date, data.appointmentDate)
-    .input('TimeSlot',        sql.NVarChar(20), data.timeSlot)
-    .input('Provider',        sql.NVarChar(300), data.provider ?? null)
-    .input('Notes_Enc',       sql.NVarChar(sql.MAX), encNotes)
-    .query<{
-      appointmentId: string; userId: string; locationName: string; locationAddress: string;
-      appointmentDate: string; timeSlot: string; provider: string; appointmentStatus: string;
-      notes_Enc: string; createdAt: Date;
-    }>(`
-      INSERT INTO dbo.Appointments
-        (UserId, LocationName, LocationAddress, AppointmentDate, TimeSlot, Provider, Notes_Enc)
-      OUTPUT
-        INSERTED.AppointmentId  AS appointmentId,
-        INSERTED.UserId         AS userId,
-        INSERTED.LocationName   AS locationName,
-        INSERTED.LocationAddress AS locationAddress,
-        INSERTED.AppointmentDate AS appointmentDate,
-        INSERTED.TimeSlot       AS timeSlot,
-        INSERTED.Provider       AS provider,
-        INSERTED.AppointmentStatus AS appointmentStatus,
-        INSERTED.Notes_Enc      AS notes_Enc,
-        INSERTED.CreatedAt      AS createdAt
-      VALUES
-        (@UserId, @LocationName, @LocationAddress, @AppointmentDate, @TimeSlot, @Provider, @Notes_Enc)
-    `);
+  const { data: row, error } = await supabase
+    .from('appointments')
+    .insert({
+      user_id: userId,
+      location_name: data.locationName,
+      location_address: data.locationAddress ?? null,
+      appointment_date: data.appointmentDate,
+      time_slot: data.timeSlot,
+      provider: data.provider ?? null,
+      notes_enc: encNotes,
+    })
+    .select('appointment_id, user_id, location_name, location_address, appointment_date, time_slot, provider, appointment_status, notes_enc, created_at')
+    .single();
 
-  const row = result.recordset[0];
+  if (error || !row) {
+    throw new Error(`[AppointmentsService] Failed to create appointment: ${error?.message}`);
+  }
 
   await logChange({
-    tableName: 'dbo.Appointments',
-    recordId: row.appointmentId,
+    tableName: 'appointments',
+    recordId: row.appointment_id,
     operation: 'INSERT',
     changedByUserId: userId,
     newValues: {
-      locationName: row.locationName,
-      appointmentDate: row.appointmentDate,
-      timeSlot: row.timeSlot,
+      locationName: row.location_name,
+      appointmentDate: row.appointment_date,
+      timeSlot: row.time_slot,
     },
     ipAddress: options?.ipAddress,
   });
 
   return {
-    ...row,
-    appointmentStatus: row.appointmentStatus as Appointment['appointmentStatus'],
-    notes: decryptPHI(row.notes_Enc),
+    appointmentId: row.appointment_id,
+    userId: row.user_id,
+    locationName: row.location_name,
+    locationAddress: row.location_address,
+    appointmentDate: row.appointment_date,
+    timeSlot: row.time_slot,
+    provider: row.provider,
+    appointmentStatus: row.appointment_status as Appointment['appointmentStatus'],
+    notes: decryptPHI(row.notes_enc),
+    createdAt: row.created_at,
   };
 }
 
@@ -112,42 +106,37 @@ export async function getAppointmentsByUser(
   userId: string,
   options?: { requestedByUserId?: string; ipAddress?: string }
 ): Promise<Appointment[]> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query<{
-      appointmentId: string; userId: string; locationName: string; locationAddress: string;
-      appointmentDate: string; timeSlot: string; provider: string; appointmentStatus: string;
-      notes_Enc: string; createdAt: Date;
-    }>(`
-      SELECT
-        AppointmentId   AS appointmentId,
-        UserId          AS userId,
-        LocationName    AS locationName,
-        LocationAddress AS locationAddress,
-        CONVERT(VARCHAR(10), AppointmentDate, 120) AS appointmentDate,
-        TimeSlot        AS timeSlot,
-        Provider        AS provider,
-        AppointmentStatus AS appointmentStatus,
-        Notes_Enc       AS notes_Enc,
-        CreatedAt       AS createdAt
-      FROM dbo.Appointments
-      WHERE UserId = @UserId AND IsActive = 1
-      ORDER BY AppointmentDate DESC
-    `);
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('appointment_id, user_id, location_name, location_address, appointment_date, time_slot, provider, appointment_status, notes_enc, created_at')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('appointment_date', { ascending: false });
+
+  if (error) {
+    throw new Error(`[AppointmentsService] Failed to fetch appointments: ${error.message}`);
+  }
 
   await logAccess({
     accessedByUserId: options?.requestedByUserId ?? userId,
-    tableName: 'dbo.Appointments',
+    tableName: 'appointments',
     ipAddress: options?.ipAddress,
     purpose: 'Treatment',
   });
 
-  return result.recordset.map((row) => ({
-    ...row,
-    appointmentStatus: row.appointmentStatus as Appointment['appointmentStatus'],
-    notes: decryptPHI(row.notes_Enc),
+  return (data ?? []).map((row) => ({
+    appointmentId: row.appointment_id,
+    userId: row.user_id,
+    locationName: row.location_name,
+    locationAddress: row.location_address,
+    appointmentDate: row.appointment_date,
+    timeSlot: row.time_slot,
+    provider: row.provider,
+    appointmentStatus: row.appointment_status as Appointment['appointmentStatus'],
+    notes: decryptPHI(row.notes_enc),
+    createdAt: row.created_at,
   }));
 }
 
@@ -161,22 +150,23 @@ export async function updateAppointmentStatus(
   cancellationReason?: string,
   options?: { changedByUserId?: string; ipAddress?: string }
 ): Promise<void> {
-  const pool = await getPool();
-  await pool
-    .request()
-    .input('AppointmentId',     sql.UniqueIdentifier, appointmentId)
-    .input('AppointmentStatus', sql.NVarChar(50), status)
-    .input('CancellationReason', sql.NVarChar(500), cancellationReason ?? null)
-    .query(`
-      UPDATE dbo.Appointments
-      SET AppointmentStatus = @AppointmentStatus,
-          CancellationReason = @CancellationReason,
-          ModifiedAt = SYSDATETIMEOFFSET()
-      WHERE AppointmentId = @AppointmentId
-    `);
+  const supabase = getSupabase();
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({
+      appointment_status: status,
+      cancellation_reason: cancellationReason ?? null,
+      modified_at: new Date().toISOString(),
+    })
+    .eq('appointment_id', appointmentId);
+
+  if (error) {
+    throw new Error(`[AppointmentsService] Failed to update status: ${error.message}`);
+  }
 
   await logChange({
-    tableName: 'dbo.Appointments',
+    tableName: 'appointments',
     recordId: appointmentId,
     operation: 'UPDATE',
     changedByUserId: options?.changedByUserId,
@@ -195,9 +185,13 @@ export async function cancelAppointment(
   options?: { changedByUserId?: string; ipAddress?: string }
 ): Promise<void> {
   await updateAppointmentStatus(appointmentId, 'Cancelled', reason, options);
-  const pool = await getPool();
-  await pool
-    .request()
-    .input('AppointmentId', sql.UniqueIdentifier, appointmentId)
-    .query(`UPDATE dbo.Appointments SET IsActive = 0, ModifiedAt = SYSDATETIMEOFFSET() WHERE AppointmentId = @AppointmentId`);
+
+  const supabase = getSupabase();
+  await supabase
+    .from('appointments')
+    .update({
+      is_active: false,
+      modified_at: new Date().toISOString(),
+    })
+    .eq('appointment_id', appointmentId);
 }

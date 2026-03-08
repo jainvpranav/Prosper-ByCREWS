@@ -1,14 +1,16 @@
 /**
  * lib/riskAssessmentService.ts
- * CRUD for dbo.RiskAssessments, dbo.RiskFactorContributions, dbo.HealthProjections
+ * CRUD for risk_assessments, risk_factor_contributions, health_projections
  *
  * HIPAA Notes:
  *  - Risk scores are derived data, not raw PHI, but are still linked to UserId
  *  - AiInsightSummary may reference PHI — treat with care and log access
  *  - All writes are audit-logged; reads log access
+ *
+ * Migrated from SQL Server (mssql) → Supabase (PostgreSQL).
  */
 
-import { getPool, sql } from './db';
+import { getSupabase } from './supabase';
 import { logChange, logAccess } from './auditLogger';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +41,7 @@ export interface RiskAssessmentInput {
 export interface RiskAssessment extends RiskAssessmentInput {
   assessmentId: string;
   userId: string;
-  assessedAt: Date;
+  assessedAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,70 +53,71 @@ export async function saveRiskAssessment(
   data: RiskAssessmentInput,
   options?: { ipAddress?: string }
 ): Promise<string> {
-  const pool = await getPool();
-  const transaction = new sql.Transaction(pool);
-  await transaction.begin();
+  const supabase = getSupabase();
 
-  try {
-    // Insert base assessment
-    const assessmentResult = await new sql.Request(transaction)
-      .input('UserId',              sql.UniqueIdentifier, userId)
-      .input('OverallRiskScore',    sql.TinyInt, data.overallRiskScore)
-      .input('GeneticDisposition',  sql.NVarChar(50), data.geneticDisposition ?? null)
-      .input('LifestyleImpact',     sql.NVarChar(50), data.lifestyleImpact ?? null)
-      .input('MedicalHistoryRisk',  sql.NVarChar(50), data.medicalHistoryRisk ?? null)
-      .input('AiInsightSummary',    sql.NVarChar(sql.MAX), data.aiInsightSummary ?? null)
-      .query<{ assessmentId: string }>(`
-        INSERT INTO dbo.RiskAssessments
-          (UserId, OverallRiskScore, GeneticDisposition, LifestyleImpact, MedicalHistoryRisk, AiInsightSummary)
-        OUTPUT INSERTED.AssessmentId AS assessmentId
-        VALUES
-          (@UserId, @OverallRiskScore, @GeneticDisposition, @LifestyleImpact, @MedicalHistoryRisk, @AiInsightSummary)
-      `);
+  // Insert base assessment
+  const { data: assessmentRow, error: assessmentError } = await supabase
+    .from('risk_assessments')
+    .insert({
+      user_id: userId,
+      overall_risk_score: data.overallRiskScore,
+      genetic_disposition: data.geneticDisposition ?? null,
+      lifestyle_impact: data.lifestyleImpact ?? null,
+      medical_history_risk: data.medicalHistoryRisk ?? null,
+      ai_insight_summary: data.aiInsightSummary ?? null,
+    })
+    .select('assessment_id')
+    .single();
 
-    const assessmentId = assessmentResult.recordset[0].assessmentId;
-
-    // Insert risk factor contributions
-    for (const factor of data.riskFactors ?? []) {
-      await new sql.Request(transaction)
-        .input('AssessmentId',    sql.UniqueIdentifier, assessmentId)
-        .input('FactorName',      sql.NVarChar(100), factor.factorName)
-        .input('ContributionPct', sql.TinyInt, factor.contributionPct)
-        .query(`
-          INSERT INTO dbo.RiskFactorContributions (AssessmentId, FactorName, ContributionPct)
-          VALUES (@AssessmentId, @FactorName, @ContributionPct)
-        `);
-    }
-
-    // Insert health projection points
-    for (const point of data.projections ?? []) {
-      await new sql.Request(transaction)
-        .input('AssessmentId',   sql.UniqueIdentifier, assessmentId)
-        .input('MonthOffset',    sql.TinyInt, point.monthOffset)
-        .input('PredictedScore', sql.TinyInt, point.predictedScore)
-        .input('BaselineScore',  sql.TinyInt, point.baselineScore)
-        .query(`
-          INSERT INTO dbo.HealthProjections (AssessmentId, MonthOffset, PredictedScore, BaselineScore)
-          VALUES (@AssessmentId, @MonthOffset, @PredictedScore, @BaselineScore)
-        `);
-    }
-
-    await transaction.commit();
-
-    await logChange({
-      tableName: 'dbo.RiskAssessments',
-      recordId: assessmentId,
-      operation: 'INSERT',
-      changedByUserId: userId,
-      newValues: { overallRiskScore: data.overallRiskScore },
-      ipAddress: options?.ipAddress,
-    });
-
-    return assessmentId;
-  } catch (err) {
-    await transaction.rollback();
-    throw err;
+  if (assessmentError || !assessmentRow) {
+    throw new Error(`[RiskAssessmentService] Failed to save assessment: ${assessmentError?.message}`);
   }
+
+  const assessmentId = assessmentRow.assessment_id;
+
+  // Insert risk factor contributions
+  if (data.riskFactors && data.riskFactors.length > 0) {
+    const factorRows = data.riskFactors.map((factor) => ({
+      assessment_id: assessmentId,
+      factor_name: factor.factorName,
+      contribution_pct: factor.contributionPct,
+    }));
+    const { error: factorError } = await supabase
+      .from('risk_factor_contributions')
+      .insert(factorRows);
+
+    if (factorError) {
+      console.error('[RiskAssessmentService] Failed to insert factors:', factorError.message);
+    }
+  }
+
+  // Insert health projection points
+  if (data.projections && data.projections.length > 0) {
+    const projectionRows = data.projections.map((point) => ({
+      assessment_id: assessmentId,
+      month_offset: point.monthOffset,
+      predicted_score: point.predictedScore,
+      baseline_score: point.baselineScore,
+    }));
+    const { error: projectionError } = await supabase
+      .from('health_projections')
+      .insert(projectionRows);
+
+    if (projectionError) {
+      console.error('[RiskAssessmentService] Failed to insert projections:', projectionError.message);
+    }
+  }
+
+  await logChange({
+    tableName: 'risk_assessments',
+    recordId: assessmentId,
+    operation: 'INSERT',
+    changedByUserId: userId,
+    newValues: { overallRiskScore: data.overallRiskScore },
+    ipAddress: options?.ipAddress,
+  });
+
+  return assessmentId;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,62 +128,59 @@ export async function getLatestAssessment(
   userId: string,
   options?: { requestedByUserId?: string; ipAddress?: string }
 ): Promise<RiskAssessment | null> {
-  const pool = await getPool();
+  const supabase = getSupabase();
 
-  const assessmentResult = await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query<{
-      assessmentId: string; overallRiskScore: number; geneticDisposition: string;
-      lifestyleImpact: string; medicalHistoryRisk: string; aiInsightSummary: string; assessedAt: Date;
-    }>(`
-      SELECT TOP 1
-        AssessmentId      AS assessmentId,
-        OverallRiskScore  AS overallRiskScore,
-        GeneticDisposition AS geneticDisposition,
-        LifestyleImpact   AS lifestyleImpact,
-        MedicalHistoryRisk AS medicalHistoryRisk,
-        AiInsightSummary  AS aiInsightSummary,
-        AssessedAt        AS assessedAt
-      FROM dbo.RiskAssessments
-      WHERE UserId = @UserId
-      ORDER BY AssessedAt DESC
-    `);
+  // Fetch latest assessment
+  const { data: assessment, error: assessmentError } = await supabase
+    .from('risk_assessments')
+    .select('assessment_id, overall_risk_score, genetic_disposition, lifestyle_impact, medical_history_risk, ai_insight_summary, assessed_at')
+    .eq('user_id', userId)
+    .order('assessed_at', { ascending: false })
+    .limit(1)
+    .single();
 
-  if (!assessmentResult.recordset[0]) return null;
-  const a = assessmentResult.recordset[0];
+  if (assessmentError || !assessment) return null;
 
+  // Fetch factors + projections in parallel
   const [factorsResult, projectionsResult] = await Promise.all([
-    pool.request().input('AssessmentId', sql.UniqueIdentifier, a.assessmentId)
-      .query<{ factorName: string; contributionPct: number }>(`
-        SELECT FactorName AS factorName, ContributionPct AS contributionPct
-        FROM dbo.RiskFactorContributions WHERE AssessmentId = @AssessmentId`),
+    supabase
+      .from('risk_factor_contributions')
+      .select('factor_name, contribution_pct')
+      .eq('assessment_id', assessment.assessment_id),
 
-    pool.request().input('AssessmentId', sql.UniqueIdentifier, a.assessmentId)
-      .query<{ monthOffset: number; predictedScore: number; baselineScore: number }>(`
-        SELECT MonthOffset AS monthOffset, PredictedScore AS predictedScore, BaselineScore AS baselineScore
-        FROM dbo.HealthProjections WHERE AssessmentId = @AssessmentId ORDER BY MonthOffset`),
+    supabase
+      .from('health_projections')
+      .select('month_offset, predicted_score, baseline_score')
+      .eq('assessment_id', assessment.assessment_id)
+      .order('month_offset', { ascending: true }),
   ]);
 
   await logAccess({
     accessedByUserId: options?.requestedByUserId ?? userId,
-    tableName: 'dbo.RiskAssessments',
-    recordId: a.assessmentId,
+    tableName: 'risk_assessments',
+    recordId: assessment.assessment_id,
     ipAddress: options?.ipAddress,
     purpose: 'Treatment',
   });
 
   return {
-    assessmentId: a.assessmentId,
+    assessmentId: assessment.assessment_id,
     userId,
-    overallRiskScore: a.overallRiskScore,
-    geneticDisposition: a.geneticDisposition,
-    lifestyleImpact: a.lifestyleImpact,
-    medicalHistoryRisk: a.medicalHistoryRisk,
-    aiInsightSummary: a.aiInsightSummary,
-    assessedAt: a.assessedAt,
-    riskFactors: factorsResult.recordset,
-    projections: projectionsResult.recordset,
+    overallRiskScore: assessment.overall_risk_score,
+    geneticDisposition: assessment.genetic_disposition,
+    lifestyleImpact: assessment.lifestyle_impact,
+    medicalHistoryRisk: assessment.medical_history_risk,
+    aiInsightSummary: assessment.ai_insight_summary,
+    assessedAt: assessment.assessed_at,
+    riskFactors: (factorsResult.data ?? []).map((f) => ({
+      factorName: f.factor_name,
+      contributionPct: f.contribution_pct,
+    })),
+    projections: (projectionsResult.data ?? []).map((p) => ({
+      monthOffset: p.month_offset,
+      predictedScore: p.predicted_score,
+      baselineScore: p.baseline_score,
+    })),
   };
 }
 
@@ -191,27 +191,29 @@ export async function getLatestAssessment(
 export async function getAssessmentHistory(
   userId: string,
   options?: { requestedByUserId?: string; ipAddress?: string }
-): Promise<Array<{ assessmentId: string; overallRiskScore: number; assessedAt: Date }>> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query<{ assessmentId: string; overallRiskScore: number; assessedAt: Date }>(`
-      SELECT
-        AssessmentId     AS assessmentId,
-        OverallRiskScore AS overallRiskScore,
-        AssessedAt       AS assessedAt
-      FROM dbo.RiskAssessments
-      WHERE UserId = @UserId
-      ORDER BY AssessedAt DESC
-    `);
+): Promise<Array<{ assessmentId: string; overallRiskScore: number; assessedAt: string }>> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('risk_assessments')
+    .select('assessment_id, overall_risk_score, assessed_at')
+    .eq('user_id', userId)
+    .order('assessed_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`[RiskAssessmentService] Failed to fetch history: ${error.message}`);
+  }
 
   await logAccess({
     accessedByUserId: options?.requestedByUserId ?? userId,
-    tableName: 'dbo.RiskAssessments',
+    tableName: 'risk_assessments',
     ipAddress: options?.ipAddress,
     purpose: 'Treatment',
   });
 
-  return result.recordset;
+  return (data ?? []).map((row) => ({
+    assessmentId: row.assessment_id,
+    overallRiskScore: row.overall_risk_score,
+    assessedAt: row.assessed_at,
+  }));
 }

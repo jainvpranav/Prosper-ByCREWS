@@ -1,14 +1,16 @@
 /**
  * lib/usersService.ts
- * CRUD operations for dbo.Users
+ * CRUD operations for public.users
  *
  * HIPAA Notes:
  *  - Passwords are NEVER stored or logged — only bcrypt/Argon2 hashes
  *  - All mutations are audit-logged
  *  - Email is the only PII in this table; treat with care
+ *
+ * Migrated from SQL Server (mssql) → Supabase (PostgreSQL).
  */
 
-import { getPool, sql } from './db';
+import { getSupabase } from './supabase';
 import { logChange, logSessionEvent } from './auditLogger';
 
 export interface User {
@@ -16,8 +18,8 @@ export interface User {
   email: string;
   isActive: boolean;
   mfaEnabled: boolean;
-  createdAt: Date;
-  lastLoginAt: Date | null;
+  createdAt: string;
+  lastLoginAt: string | null;
 }
 
 // ------------------------------------
@@ -34,32 +36,39 @@ export async function createUser(
   passwordHash: string,
   options?: { ipAddress?: string; userAgent?: string }
 ): Promise<User> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Email', sql.NVarChar(320), email.toLowerCase().trim())
-    .input('PasswordHash', sql.NVarChar(512), passwordHash)
-    .query<User>(`
-      INSERT INTO dbo.Users (Email, PasswordHash)
-      OUTPUT
-        INSERTED.UserId     AS userId,
-        INSERTED.Email      AS email,
-        INSERTED.IsActive   AS isActive,
-        INSERTED.MfaEnabled AS mfaEnabled,
-        INSERTED.CreatedAt  AS createdAt,
-        INSERTED.LastLoginAt AS lastLoginAt
-      VALUES (@Email, @PasswordHash)
-    `);
+  const supabase = getSupabase();
 
-  const user = result.recordset[0];
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      email: email.toLowerCase().trim(),
+      password_hash: passwordHash,
+    })
+    .select('user_id, email, is_active, mfa_enabled, created_at, last_login_at')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`[UsersService] Failed to create user: ${error?.message}`);
+  }
+
+  const user: User = {
+    userId: data.user_id,
+    email: data.email,
+    isActive: data.is_active,
+    mfaEnabled: data.mfa_enabled,
+    createdAt: data.created_at,
+    lastLoginAt: data.last_login_at,
+  };
+
   await logChange({
-    tableName: 'dbo.Users',
+    tableName: 'users',
     recordId: user.userId,
     operation: 'INSERT',
     newValues: { email: user.email },
     ipAddress: options?.ipAddress,
     userAgent: options?.userAgent,
   });
+
   return user;
 }
 
@@ -68,22 +77,25 @@ export async function createUser(
 // ------------------------------------
 
 export async function getUserById(userId: string): Promise<User | null> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query<User>(`
-      SELECT
-        UserId     AS userId,
-        Email      AS email,
-        IsActive   AS isActive,
-        MfaEnabled AS mfaEnabled,
-        CreatedAt  AS createdAt,
-        LastLoginAt AS lastLoginAt
-      FROM dbo.Users
-      WHERE UserId = @UserId AND IsActive = 1
-    `);
-  return result.recordset[0] ?? null;
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('user_id, email, is_active, mfa_enabled, created_at, last_login_at')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    userId: data.user_id,
+    email: data.email,
+    isActive: data.is_active,
+    mfaEnabled: data.mfa_enabled,
+    createdAt: data.created_at,
+    lastLoginAt: data.last_login_at,
+  };
 }
 
 /**
@@ -93,16 +105,22 @@ export async function getUserById(userId: string): Promise<User | null> {
 export async function getUserAuthRecord(
   email: string
 ): Promise<{ userId: string; passwordHash: string; mfaEnabled: boolean } | null> {
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('Email', sql.NVarChar(320), email.toLowerCase().trim())
-    .query<{ userId: string; passwordHash: string; mfaEnabled: boolean }>(`
-      SELECT UserId AS userId, PasswordHash AS passwordHash, MfaEnabled AS mfaEnabled
-      FROM dbo.Users
-      WHERE Email = @Email AND IsActive = 1
-    `);
-  return result.recordset[0] ?? null;
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('user_id, password_hash, mfa_enabled')
+    .eq('email', email.toLowerCase().trim())
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    userId: data.user_id,
+    passwordHash: data.password_hash,
+    mfaEnabled: data.mfa_enabled,
+  };
 }
 
 // ------------------------------------
@@ -113,31 +131,45 @@ export async function updateLastLogin(
   userId: string,
   options?: { ipAddress?: string; userAgent?: string }
 ): Promise<void> {
-  const pool = await getPool();
-  await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .query(`
-      UPDATE dbo.Users
-      SET LastLoginAt = SYSDATETIMEOFFSET(), ModifiedAt = SYSDATETIMEOFFSET()
-      WHERE UserId = @UserId
-    `);
+  const supabase = getSupabase();
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      last_login_at: new Date().toISOString(),
+      modified_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('[UsersService] Failed to update last login:', error.message);
+  }
 
   await logSessionEvent(userId, 'LOGIN_SUCCESS', options?.ipAddress, options?.userAgent);
 }
 
 export async function enableMFA(userId: string, totpSecret: string): Promise<void> {
-  const pool = await getPool();
-  await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .input('MfaSecret', sql.NVarChar(256), totpSecret)
-    .query(`
-      UPDATE dbo.Users
-      SET MfaEnabled = 1, MfaSecret = @MfaSecret, ModifiedAt = SYSDATETIMEOFFSET()
-      WHERE UserId = @UserId
-    `);
-  await logChange({ tableName: 'dbo.Users', recordId: userId, operation: 'UPDATE', newValues: { mfaEnabled: true } });
+  const supabase = getSupabase();
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      mfa_enabled: true,
+      mfa_secret: totpSecret,
+      modified_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`[UsersService] Failed to enable MFA: ${error.message}`);
+  }
+
+  await logChange({
+    tableName: 'users',
+    recordId: userId,
+    operation: 'UPDATE',
+    newValues: { mfaEnabled: true },
+  });
 }
 
 // ------------------------------------
@@ -145,21 +177,32 @@ export async function enableMFA(userId: string, totpSecret: string): Promise<voi
 // ------------------------------------
 
 /**
- * Fully purges a user's PHI by calling the stored procedure dbo.usp_PurgeUserPHI.
+ * Fully purges a user's PHI.
  * Use this for "Right to Delete" / HIPAA de-identification requests.
  */
 export async function purgeUser(
   userId: string,
   options?: { requestedByUserId?: string; ipAddress?: string }
 ): Promise<void> {
-  const pool = await getPool();
-  await pool
-    .request()
-    .input('UserId', sql.UniqueIdentifier, userId)
-    .execute('dbo.usp_PurgeUserPHI');
+  const supabase = getSupabase();
+
+  // 1. Soft-delete the user account
+  await supabase
+    .from('users')
+    .update({
+      is_active: false,
+      email: `purged_${userId}`,
+      modified_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  // 2. Hard-delete PHI (cascade handles child tables via FK ON DELETE CASCADE)
+  await supabase.from('user_profiles').delete().eq('user_id', userId);
+  await supabase.from('appointments').delete().eq('user_id', userId);
+  await supabase.from('chat_messages').delete().eq('user_id', userId);
 
   await logChange({
-    tableName: 'dbo.Users',
+    tableName: 'users',
     recordId: userId,
     operation: 'PURGE',
     changedByUserId: options?.requestedByUserId,
