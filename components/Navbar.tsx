@@ -12,8 +12,8 @@ export function Navbar() {
   const pathname = usePathname();
   const { user, logout, loading } = useAuth();
 
-  // Determine if we're on app routes or public routes
   const isAppRoute = pathname.startsWith('/dashboard') || 
+                     pathname.startsWith('/health-plan') ||
                      pathname.startsWith('/appointments') || 
                      pathname.startsWith('/risk-assessment') ||
                      pathname.startsWith('/profile');
@@ -27,6 +27,7 @@ export function Navbar() {
 
   const appLinks = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/health-plan', label: 'Health Plan' },
     { href: '/appointments', label: 'Appointments' },
     { href: '/profile', label: 'My Profile' },
   ];

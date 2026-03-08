@@ -20,12 +20,15 @@ import { logChange, logAccess } from './auditLogger';
 // ---------------------------------------------------------------------------
 
 export interface AppointmentInput {
-  locationName: string;
+  locationName?: string; // Made optional for Telehealth
   locationAddress?: string;
   appointmentDate: string; // 'YYYY-MM-DD'
   timeSlot: string;        // e.g. '09:00 AM'
   provider?: string;
   notes?: string;          // PHI — will be encrypted
+  appointmentType?: string;
+  bookingMode?: string;
+  doctorType?: string;
 }
 
 export interface Appointment {
@@ -57,11 +60,14 @@ export async function createAppointment(
     .from('appointments')
     .insert({
       user_id: userId,
-      location_name: data.locationName,
+      location_name: data.locationName ?? null,
       location_address: data.locationAddress ?? null,
       appointment_date: data.appointmentDate,
       time_slot: data.timeSlot,
-      provider: data.provider ?? null,
+      provider: data.provider ?? data.doctorType ?? null,
+      appointment_type: data.appointmentType ?? 'Regular Check-up',
+      booking_mode: data.bookingMode ?? 'In-person',
+      doctor_type: data.doctorType ?? null,
       notes_enc: encNotes,
     })
     .select('appointment_id, user_id, location_name, location_address, appointment_date, time_slot, provider, appointment_status, notes_enc, created_at')
@@ -80,6 +86,7 @@ export async function createAppointment(
       locationName: row.location_name,
       appointmentDate: row.appointment_date,
       timeSlot: row.time_slot,
+      bookingMode: data.bookingMode,
     },
     ipAddress: options?.ipAddress,
   });

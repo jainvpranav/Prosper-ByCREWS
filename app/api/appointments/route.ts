@@ -40,14 +40,43 @@ export async function POST(req: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
-    if (!appointmentData.locationName || !appointmentData.appointmentDate || !appointmentData.timeSlot) {
+    // Legacy map checking vs new Telehealth flow
+    const isNewFlow = !!appointmentData.appointment_type;
+    
+    if (!isNewFlow && (!appointmentData.locationName || !appointmentData.appointmentDate || !appointmentData.timeSlot)) {
       return NextResponse.json(
-        { error: 'locationName, appointmentDate, and timeSlot are required' },
+        { error: 'locationName, appointmentDate, and timeSlot are required for legacy bookings' },
         { status: 400 }
       );
     }
 
-    const appointment = await createAppointment(userId, appointmentData, {
+    if (isNewFlow && !appointmentData.date) {
+      return NextResponse.json(
+        { error: 'date is required for new bookings' },
+        { status: 400 }
+      );
+    }
+
+    // Map the payload to the service expected input
+    const serviceInput = isNewFlow 
+      ? {
+          appointmentDate: appointmentData.date,
+          timeSlot: appointmentData.time_slot,
+          notes: appointmentData.notes,
+          appointmentType: appointmentData.appointment_type,
+          bookingMode: appointmentData.booking_mode,
+          doctorType: appointmentData.doctor_type,
+          locationName: appointmentData.booking_mode === 'Telehealth' ? 'Virtual Session' : 'Prosper Clinic',
+        }
+      : {
+          locationName: appointmentData.locationName,
+          appointmentDate: appointmentData.appointmentDate,
+          timeSlot: appointmentData.timeSlot,
+          provider: appointmentData.provider,
+          notes: appointmentData.notes,
+        };
+
+    const appointment = await createAppointment(userId, serviceInput, {
       ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
     });
 
@@ -55,10 +84,10 @@ export async function POST(req: NextRequest) {
     getUserById(userId).then(user => {
       if (user && user.email) {
         sendAppointmentConfirmationEmail(user.email, {
-          locationName: appointmentData.locationName,
-          appointmentDate: appointmentData.appointmentDate,
-          timeSlot: appointmentData.timeSlot,
-          provider: appointmentData.provider || 'Assigned Provider',
+          locationName: serviceInput.locationName || 'Virtual Session',
+          appointmentDate: serviceInput.appointmentDate,
+          timeSlot: serviceInput.timeSlot,
+          provider: serviceInput.provider || serviceInput.doctorType || 'Assigned Provider',
         });
       }
     }).catch(err => console.error('[API /appointments POST] Error fetching user for email', err));
