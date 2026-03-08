@@ -7,7 +7,7 @@ import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
 import {
   Search, Star, MapPin, Clock, Sun, Cloud,
-  CheckCircle2, ChevronLeft, ChevronRight, Loader2,
+  CheckCircle2, ChevronLeft, ChevronRight, Loader2, Hospital, Stethoscope, Cross, ActivitySquare, PlusSquare, Crosshair, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Appointment } from '@/lib/appointmentsService';
@@ -32,27 +32,6 @@ export interface LocationData {
 
 
 const fallbackLocations: LocationData[] = [
-  {
-    id: 1,
-    name: 'Downtown Medical Center',
-    distance: '0.5 km',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1631217b831ec4bd7f4fa0649ea033019?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: 2,
-    name: 'Westside Health Clinic',
-    distance: '2.3 km',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1576091160550-2173fe9e0f0d?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: 3,
-    name: 'Central Health Services',
-    distance: '1.8 km',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1516534775068-bb6baaf00da8?auto=format&fit=crop&w=300&q=80',
-  },
 ];
 
 const timeSlots = {
@@ -337,32 +316,43 @@ export default function AppointmentsPage() {
               </div>
 
               <div className="space-y-3 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {locations.map((loc) => (
-                  <button
-                    key={loc.id}
-                    onClick={() => setSelectedLocation(loc)}
-                    className={`w-full rounded-2xl overflow-hidden border-2 transition-all text-left ${
-                      selectedLocation.id === loc.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <img src={loc.image} alt={loc.name} className="w-full h-32 object-cover" />
-                    <div className="p-3">
-                      <p className="font-semibold text-sm">{loc.name}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="w-3 h-3" />
+                {locations.map((loc) => {
+                  const icons = [Building2, Hospital, Stethoscope, Cross, ActivitySquare, PlusSquare, Crosshair];
+                  const RandomIcon = icons[loc.id % icons.length] || Hospital;
+                  const isSelected = selectedLocation.id === loc.id;
+                  return (
+                    <button
+                      key={loc.id}
+                      onClick={() => setSelectedLocation(loc)}
+                      className={`w-full rounded-2xl overflow-hidden border-2 transition-all text-left ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className={`w-full h-32 flex items-center justify-center ${
+                        isSelected 
+                          ? 'bg-gradient-to-br from-primary/80 to-teal-500/80' 
+                          : 'bg-gradient-to-br from-primary/30 to-teal-500/30'
+                      }`}>
+                        <RandomIcon className={`w-12 h-12 ${isSelected ? 'text-white' : 'text-primary/70'}`} />
+                      </div>
+                      <div className="p-3">
+                        <p className="font-semibold text-sm">{loc.name}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
                           {loc.distance}
                         </div>
                         <div className="flex items-center gap-1 text-xs">
                           <Star className="w-3 h-3 fill-primary text-primary" />
                           {loc.rating}
                         </div>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

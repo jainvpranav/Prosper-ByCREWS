@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { FloatingChat } from '@/components/FloatingChat';
-import { ChevronLeft, ChevronRight, Loader2, Shield, AlertTriangle, CheckCircle2, User, Activity, Heart, Dna, MapPin, Scale, Cigarette, Pill, RefreshCw } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Loader2, CheckCircle2, User, Activity, Heart, Dna, MapPin, Scale, Cigarette, Pill, RefreshCw, Shield, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { FullProfile } from '@/lib/profileService';
 import type { RiskAssessment } from '@/lib/riskAssessmentService';
@@ -174,7 +175,8 @@ export default function ProfilePage() {
   const forceAssess = searchParams.get('mode') === 'assess';
 
   // ── Profile view state ────────────────────────────────────
-  const [viewMode, setViewMode] = useState<'loading' | 'profile' | 'questionnaire'>('loading');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAssessmentOpen, setIsAssessmentOpen] = useState(false);
   const [profileData, setProfileData] = useState<FullProfile | null>(null);
   const [assessmentData, setAssessmentData] = useState<RiskAssessment | null>(null);
 
@@ -190,8 +192,7 @@ export default function ProfilePage() {
 
   // ── Load profile data on mount ────────────────────────────
   useEffect(() => {
-    if (!user) { setViewMode('questionnaire'); return; }
-    if (forceAssess) { setViewMode('questionnaire'); return; }
+    if (!user) { setIsLoading(false); setIsAssessmentOpen(true); return; }
 
     async function loadProfile() {
       try {
@@ -200,20 +201,23 @@ export default function ProfilePage() {
           fetch(`/api/risk-assessment?userId=${user!.userId}`),
         ]);
 
+        let pDataRaw = null;
         if (profileRes.ok) {
-          const pData = await profileRes.json();
-          setProfileData(pData.profile ?? null);
+          pDataRaw = await profileRes.json();
+          setProfileData(pDataRaw.profile ?? null);
         }
         if (assessmentRes.ok) {
           const aData = await assessmentRes.json();
           setAssessmentData(aData.assessment ?? null);
         }
 
-        // If profile exists, show it; otherwise show questionnaire
-        const pData = profileRes.ok ? (await profileRes.clone().json()).profile : null;
-        setViewMode(pData ? 'profile' : 'questionnaire');
+        if (!pDataRaw?.profile || forceAssess) {
+          setIsAssessmentOpen(true);
+        }
       } catch {
-        setViewMode('questionnaire');
+        setIsAssessmentOpen(true);
+      } finally {
+        setIsLoading(false);
       }
     }
     loadProfile();
@@ -559,7 +563,9 @@ export default function ProfilePage() {
       );
 
       setSubmitted(true);
-      setTimeout(() => router.push('/dashboard'), 2000);
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 2000);
     } catch (err: any) {
       console.error('[Onboarding submit]', err);
       setSubmitError(err.message ?? 'Failed to submit assessment.');
@@ -1450,7 +1456,6 @@ export default function ProfilePage() {
                   <span className="font-semibold">
                     {answers.bmi >= 30 ? 'Obese' : answers.bmi >= 25 ? 'Overweight' : 'Normal'}
                   </span>
-                  {answers.bmi >= 30}
                 </p>
               </div>
             )}
@@ -1586,7 +1591,7 @@ export default function ProfilePage() {
   );
 
   // ── Render ─────────────────────────────────────────────
-  if (viewMode === 'loading') {
+  if (isLoading) {
     return (
       <main className="bg-background min-h-screen">
         <Navbar />
@@ -1598,39 +1603,40 @@ export default function ProfilePage() {
     );
   }
 
-  if (viewMode === 'profile' && profileData) {
-    const bmiVal = profileData.heightCm && profileData.weightKg
-      ? (profileData.weightKg / ((profileData.heightCm / 100) ** 2)).toFixed(1)
-      : null;
+  const bmiVal = profileData?.heightCm && profileData?.weightKg
+    ? (profileData.weightKg / ((profileData.heightCm / 100) ** 2)).toFixed(1)
+    : null;
 
-    return (
-      <main className="bg-background min-h-screen">
-        <Navbar />
-        <FloatingChat />
+  return (
+    <main className="bg-background min-h-screen">
+      <Navbar />
+      <FloatingChat />
 
-        <div className="px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-          <div className="mx-auto max-w-5xl">
-            {/* Header */}
-            <div className="mb-10 flex items-center justify-between flex-col sm:flex-row gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-rose-400 flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold">My Profile</h1>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+      <div className="px-4 sm:px-6 lg:px-8 py-12 md:py-20">
+        <div className="mx-auto max-w-5xl">
+          {profileData ? (
+            <>
+              {/* Header */}
+              <div className="mb-10 flex items-center justify-between flex-col sm:flex-row gap-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-rose-400 flex items-center justify-center">
+                      <User className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl md:text-3xl font-bold">My Profile</h1>
+                      <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => setIsAssessmentOpen(true)}
+                  className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Retake Assessment
+                </button>
               </div>
-              <button
-                onClick={() => setViewMode('questionnaire')}
-                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Retake Assessment
-              </button>
-            </div>
 
             {/* Risk Summary Banner */}
             {assessmentData && (
@@ -1706,95 +1712,105 @@ export default function ProfilePage() {
                 )}
               </ProfileInfoCard>
             </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // ── Questionnaire Mode (original flow) ─────────────────
-  return (
-    <main className="bg-background min-h-screen">
-      <Navbar />
-      <FloatingChat />
-
-      <div className="px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-        <div className="mx-auto max-w-2xl">
-          {renderHeader()}
-
-          {submitError && (
-            <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              <span>{submitError}</span>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-card rounded-2xl border border-border">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <User className="w-8 h-8 text-muted-foreground opacity-50" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Welcome to your Profile</h2>
+              <p className="text-muted-foreground mb-6 max-w-md">Please complete your initial health risk assessment to build your personalized profile and view your analysis.</p>
+              <button onClick={() => setIsAssessmentOpen(true)} className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity">
+                Start Health Assessment
+              </button>
             </div>
-          )}
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentQuestion}
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -40 }}
-              transition={{ duration: 0.25 }}
-              className="mb-6 rounded-2xl border border-border bg-card p-6 md:p-8"
-            >
-              {renderQuestion()}
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={history.length <= 1 || isSubmitting}
-              className="flex items-center gap-2 rounded-xl border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={isNextDisabled() || isSubmitting}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLastQuestion ? (
-                isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting…
-                  </>
-                ) : (
-                  'Submit assessment'
-                )
-              ) : (
-                <>
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </div>
-
-          {submitted && (
-            <AnimatePresence>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-8 flex flex-col items-center gap-4 rounded-2xl border border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30 p-8 text-center"
-              >
-                <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
-                <h3 className="text-lg font-bold text-green-900 dark:text-green-100">Assessment Submitted!</h3>
-                <p className="text-sm text-green-800 dark:text-green-200">
-                  Your results are ready. Redirecting you to your dashboard…
-                </p>
-                <Loader2 className="w-5 h-5 animate-spin text-green-600 dark:text-green-400" />
-              </motion.div>
-            </AnimatePresence>
           )}
         </div>
       </div>
+
+      {/* ── Assessment Dialog ─────────────────────────────── */}
+      <Dialog open={isAssessmentOpen} onOpenChange={setIsAssessmentOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 sm:rounded-3xl shadow-2xl">
+          <DialogHeader className="sticky top-0 p-6 md:px-8 md:py-6 flex flex-row items-center justify-between z-20 bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-sm">
+            <DialogTitle className="text-xl font-bold">Health Assessment</DialogTitle>
+          </DialogHeader>
+
+          <div className="p-6 md:p-8">
+            {renderHeader()}
+
+            {submitError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentQuestion}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="mb-8 rounded-2xl border border-border bg-card p-6 md:p-8 relative"
+              >
+                {renderQuestion()}
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={handlePrevious}
+                disabled={history.length <= 1 || isSubmitting}
+                className="flex items-center gap-2 rounded-xl border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={isNextDisabled() || isSubmitting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLastQuestion ? (
+                  isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    'Submit assessment'
+                  )
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {submitted && (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="mt-8 flex flex-col items-center gap-4 rounded-2xl border border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30 p-8 text-center"
+                >
+                  <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
+                  <h3 className="text-lg font-bold text-green-900 dark:text-green-100">Assessment Submitted!</h3>
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    Your results are ready. Generating your profile...
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

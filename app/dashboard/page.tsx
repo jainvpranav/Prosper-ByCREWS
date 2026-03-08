@@ -189,6 +189,9 @@ export default function DashboardPage() {
         .replace(/\u2022/g, '-')
         .replace(/\u25B2/g, '[+]')
         .replace(/\u25BC/g, '[-]')
+        .replace(/&p\b\s*/g, '[!] ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
         .replace(/[^\x00-\xFF]/g, '');
 
     // ── Header ───────────────────────────────────────────────
@@ -406,13 +409,15 @@ export default function DashboardPage() {
                   <TrendingUp className="w-4 h-4" />
                   New Assessment
                 </Link>
-                <button 
-                  onClick={handleExportReport}
-                  className="px-6 py-2 rounded-xl border border-border text-foreground hover:bg-muted transition-colors font-semibold flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Export Report
-                </button>
+                {assessment && (
+                  <button 
+                    onClick={handleExportReport}
+                    className="px-6 py-2 rounded-xl border border-border text-foreground hover:bg-muted transition-colors font-semibold flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Report
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -625,16 +630,17 @@ export default function DashboardPage() {
           {/* ------------------------------------------------------------------ */}
           {/* SECTION: 6-Month Projection Chart                                   */}
           {/* ------------------------------------------------------------------ */}
-          <div className="bg-card border border-border rounded-2xl p-8 mb-12">
-            <h2 className="text-xl font-bold mb-6">6-Month Health Risk Projection</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={projectionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--muted-foreground)" />
-                <YAxis stroke="var(--muted-foreground)" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
+          {assessment && (
+            <div className="bg-card border border-border rounded-2xl p-8 mb-12">
+              <h2 className="text-xl font-bold mb-6">6-Month Health Risk Projection</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={projectionData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" stroke="var(--muted-foreground)" />
+                  <YAxis stroke="var(--muted-foreground)" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--card)',
                     border: '1px solid var(--border)',
                     borderRadius: '0.75rem',
                   }}
@@ -649,36 +655,39 @@ export default function DashboardPage() {
                   strokeWidth={2}
                   dot={{ fill: 'var(--primary)' }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="baseline"
-                  stroke="var(--muted-foreground)"
-                  name="Without Changes"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+                  <Line
+                    type="monotone"
+                    dataKey="baseline"
+                    stroke="var(--muted-foreground)"
+                    name="Without Changes"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* ------------------------------------------------------------------ */}
           {/* SECTION: Recommended Actions                                        */}
           {/* ------------------------------------------------------------------ */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {[
-              { num: '1', title: 'Increase Physical Activity', desc: 'Aim for 150 minutes of moderate exercise weekly' },
-              { num: '2', title: 'Improve Diet Quality', desc: 'Reduce processed foods and increase vegetables' },
-              { num: '3', title: 'Schedule Checkup', desc: 'Book an appointment with your healthcare provider' },
-            ].map((action, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-2xl p-6">
-                <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center mb-4">
-                  {action.num}
+          {assessment && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              {[
+                { num: '1', title: 'Increase Physical Activity', desc: 'Aim for 150 minutes of moderate exercise weekly' },
+                { num: '2', title: 'Improve Diet Quality', desc: 'Reduce processed foods and increase vegetables' },
+                { num: '3', title: 'Schedule Checkup', desc: 'Book an appointment with your healthcare provider' },
+              ].map((action, idx) => (
+                <div key={idx} className="bg-card border border-border rounded-2xl p-6">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center mb-4">
+                    {action.num}
+                  </div>
+                  <h3 className="font-bold mb-2">{action.title}</h3>
+                  <p className="text-sm text-muted-foreground">{action.desc}</p>
                 </div>
-                <h3 className="font-bold mb-2">{action.title}</h3>
-                <p className="text-sm text-muted-foreground">{action.desc}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* ------------------------------------------------------------------ */}
           {/* SECTION: Generate Care Plan CTA                                     */}
@@ -698,18 +707,20 @@ export default function DashboardPage() {
           {/* ------------------------------------------------------------------ */}
           {/* SECTION: AI Insights                                                */}
           {/* ------------------------------------------------------------------ */}
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <div className="flex items-start gap-4">
-              <Sparkles className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
-              <div className="flex-1">
-                <h3 className="font-bold mb-2">Pip&apos;s Health Insight</h3>
-                <p className="text-muted-foreground mb-4">{aiInsight}</p>
-                <button className="text-primary font-semibold text-sm hover:gap-2 flex items-center gap-1 transition-all">
-                  Chat with Pip →
-                </button>
+          {assessment && (
+            <div className="bg-card border border-border rounded-2xl p-8">
+              <div className="flex items-start gap-4">
+                <Sparkles className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold mb-2">Pip&apos;s Health Insight</h3>
+                  <p className="text-muted-foreground mb-4">{aiInsight}</p>
+                  <button className="text-primary font-semibold text-sm hover:gap-2 flex items-center gap-1 transition-all">
+                    Chat with Pip →
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>
