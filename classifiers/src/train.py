@@ -38,7 +38,7 @@ from sklearn.metrics  import (
 )
 from imblearn.over_sampling import SMOTE
 
-from config       import (
+from classifiers.src.config       import (
     TRAIN_FILE, VAL_FILE, TEST_FILE, MODEL_FILE, METRICS_FILE, OUTPUT_DIR,
     TARGET_COL, ALL_FEATURES, XGB_PARAMS, SMOTE_RANDOM_STATE,
     USE_CROSS_VAL, N_FOLDS,
@@ -284,7 +284,7 @@ def evaluate(y_true, y_prob, threshold, label="Validation"):
 #  STEP 7 — SHAP
 # ------------------------------------------------------------------ #
 def compute_shap(model, X_proc):
-    from config import NUMERIC_FEATURES, CATEGORICAL_FEATURES
+    from classifiers.src.config import NUMERIC_FEATURES, CATEGORICAL_FEATURES
     feature_names = NUMERIC_FEATURES + CATEGORICAL_FEATURES
     print("[train] Computing SHAP values...")
     explainer = shap.TreeExplainer(model)

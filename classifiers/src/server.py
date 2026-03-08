@@ -40,23 +40,51 @@ _cache: dict = {
     "explainer":    None,
 }
 
-
+# ------------------------------------------------------------------ #
+#  Artifact loading — Lambda-compatible
+# ------------------------------------------------------------------ #
 def load_artifacts():
-    if not os.path.exists(MODEL_FILE):
-        raise RuntimeError(
-            f"\n[serve] ❌ Model not found: {MODEL_FILE}"
-            f"\n[serve]    Run `python src/train.py` first."
-        )
-    print(f"[serve] Loading model from {MODEL_FILE} ...")
-    artifact = joblib.load(MODEL_FILE)
+    # /tmp is the ONLY writable path in Lambda
+    # Check /tmp first — avoids re-downloading on warm calls
+    model_local = os.environ.get(
+        "MODEL_LOCAL_PATH",
+        "/tmp/prosper_pipeline.joblib"
+    )
 
+    if not os.path.exists(model_local):
+        s3_uri = os.environ.get("MODEL_S3_URI", "")
+
+        if s3_uri:
+            # Running in Lambda — download from S3
+            import boto3
+            path   = s3_uri.replace("s3://", "")
+            bucket = path.split("/")[0]
+            key    = "/".join(path.split("/")[1:])
+            print(f"[cold start] Downloading model from {s3_uri}")
+            boto3.client("s3").download_file(bucket, key, model_local)
+            print(f"[cold start] Saved to {model_local}")
+
+        elif os.path.exists(MODEL_FILE):
+            # Running locally — use local model file as before
+            model_local = MODEL_FILE
+            print(f"[serve] Loading local model from {model_local}")
+
+        else:
+            raise RuntimeError(
+                f"\n[serve] ❌ No model found."
+                f"\n         Set MODEL_S3_URI env var (Lambda)"
+                f"\n         or run python src/train.py (local)"
+            )
+    else:
+        print(f"[warm] Reusing cached model at {model_local}")
+
+    artifact = joblib.load(model_local)
     _cache["preprocessor"] = artifact["preprocessor"]
     _cache["model"]        = artifact["model"]
     _cache["threshold"]    = artifact["threshold"]
 
     print("[serve] Building SHAP explainer (once) ...")
     _cache["explainer"] = shap.TreeExplainer(artifact["model"])
-
     print(f"[serve] ✅ Ready  |  threshold={_cache['threshold']:.4f}")
 
 
@@ -64,8 +92,6 @@ def load_artifacts():
 async def lifespan(app: FastAPI):
     load_artifacts()
     yield
-
-
 # ------------------------------------------------------------------ #
 #  Input schema — matches Framingham-trained model exactly
 # ------------------------------------------------------------------ #
@@ -159,6 +185,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount cancer rule-based engine
+from cancer.routes import router as cancer_router
+app.include_router(cancer_router)
 
 
 @app.get("/health", tags=["Meta"])

@@ -1,0 +1,23 @@
+# Dockerfile.lambda
+# Uses AWS Lambda Python base image.
+# Do NOT use python:3.10-slim for Lambda.
+
+FROM public.ecr.aws/lambda/python:3.10
+
+WORKDIR /var/task
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ ./src/
+
+RUN chmod -R 755 /var/task
+
+# Environment variables — values set in Lambda console later
+ENV MODEL_S3_URI=""
+ENV MODEL_LOCAL_PATH="/tmp/prosper_pipeline.joblib"
+
+# Lambda handler — points to src/lambda_handler.py → handler
+CMD ["src.lambda_handler.handler"]
