@@ -11,10 +11,27 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Appointment } from '@/lib/appointmentsService';
+import dynamic from 'next/dynamic';
+
+const HospitalMap = dynamic(() => import('@/components/HospitalMap'), { 
+  ssr: false, 
+  loading: () => <div className="h-full w-full min-h-[400px] bg-muted animate-pulse rounded-2xl flex items-center justify-center text-muted-foreground">Loading Map...</div> 
+});
+
+export interface LocationData {
+  id: number;
+  name: string;
+  distance: string;
+  rating: number;
+  image: string;
+  lat?: number;
+  lon?: number;
+  tags?: any;
+}
 
 
 
-const locations = [
+const fallbackLocations: LocationData[] = [
   {
     id: 1,
     name: 'Downtown Medical Center',
@@ -46,7 +63,8 @@ const timeSlots = {
 export default function AppointmentsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [selectedLocation, setSelectedLocation] = useState(locations[0]);
+  const [locations, setLocations] = useState<LocationData[]>(fallbackLocations);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData>(fallbackLocations[0]);
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 2)); // March 2025
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -54,9 +72,13 @@ export default function AppointmentsPage() {
   const [bookedAppointment, setBookedAppointment] = useState<Appointment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Past appointments from DB
   const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
   const [loadingPast, setLoadingPast] = useState(true);
+
+  // Map & Geolocation State
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
@@ -79,6 +101,65 @@ export default function AppointmentsPage() {
     }
     loadAppointments();
   }, [user]);
+
+  // Fetch Hospitals via Geolocation
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLocation([latitude, longitude]);
+        
+        try {
+          const query = `
+            [out:json];
+            (
+              node["amenity"="hospital"](around:5000, ${latitude}, ${longitude});
+              node["amenity"="clinic"](around:5000, ${latitude}, ${longitude});
+            );
+            out body;
+          `;
+          const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+          if (!res.ok) throw new Error('Network response was not ok');
+          const data = await res.json();
+          const fetchedHospitals = data.elements.filter((el: any) => el.tags && el.tags.name).map((el: any) => ({
+            id: el.id,
+            lat: el.lat,
+            lon: el.lon,
+            tags: el.tags,
+            name: el.tags?.name || 'Unnamed Healthcare Facility',
+            distance: 'Nearby', 
+            rating: (4.0 + Math.random()).toFixed(1), // Mock rating
+            image: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e2e8f0'/><path d='M200 120 l0 60 M170 150 l60 0' stroke='%2394a3b8' stroke-width='20' stroke-linecap='square'/></svg>",
+          }));
+
+          if (fetchedHospitals.length > 0) {
+            const topHospitals = fetchedHospitals.slice(0, 10);
+            setLocations(topHospitals);
+            setSelectedLocation(topHospitals[0]);
+          } else {
+            setLocationError("No hospitals found nearby.");
+          }
+        } catch (err) {
+          console.error('[Map Fetch Error]', err);
+          setLocationError("Failed to fetch nearby hospitals.");
+        } finally {
+          setLoadingLocation(false);
+        }
+      },
+      (err) => {
+        console.error('[Geolocation Error]', err);
+        setLocationError("Unable to retrieve your location. Using fallback locations.");
+        setLoadingLocation(false);
+      },
+      { timeout: 10000 }
+    );
+  }, []);
 
   const getDaysInMonth = (date: Date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -220,6 +301,25 @@ export default function AppointmentsPage() {
             </div>
           )}
 
+          {/* Map Display */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+            <div className="lg:col-span-4 h-[400px] border border-border rounded-2xl overflow-hidden shadow-sm relative z-0">
+               {userLocation ? (
+                 <HospitalMap userLocation={userLocation} hospitals={locations as any} onSelectHospital={(hospital: any) => setSelectedLocation(hospital)} />
+               ) : (
+                 <div className="w-full h-full bg-muted flex flex-col items-center justify-center text-muted-foreground gap-3">
+                   {loadingLocation ? (
+                     <><Loader2 className="w-8 h-8 animate-spin" /><span>Getting your location & finding nearby hospitals...</span></>
+                   ) : locationError ? (
+                     <><MapPin className="w-8 h-8" /><span>{locationError}</span></>
+                   ) : (
+                     <><MapPin className="w-8 h-8" /><span>Requesting location...</span></>
+                   )}
+                 </div>
+               )}
+            </div>
+          </div>
+
           {/* Main Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Left: Location Selector */}
@@ -236,7 +336,7 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {locations.map((loc) => (
                   <button
                     key={loc.id}

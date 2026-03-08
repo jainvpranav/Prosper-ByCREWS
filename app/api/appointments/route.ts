@@ -10,6 +10,8 @@ import {
   createAppointment,
   getAppointmentsByUser,
 } from '@/lib/appointmentsService';
+import { getUserById } from '@/lib/usersService';
+import { sendAppointmentConfirmationEmail } from '@/lib/emailService';
 
 export async function GET(req: NextRequest) {
   try {
@@ -48,6 +50,18 @@ export async function POST(req: NextRequest) {
     const appointment = await createAppointment(userId, appointmentData, {
       ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
     });
+
+    // Fire & Forget email sending
+    getUserById(userId).then(user => {
+      if (user && user.email) {
+        sendAppointmentConfirmationEmail(user.email, {
+          locationName: appointmentData.locationName,
+          appointmentDate: appointmentData.appointmentDate,
+          timeSlot: appointmentData.timeSlot,
+          provider: appointmentData.provider || 'Assigned Provider',
+        });
+      }
+    }).catch(err => console.error('[API /appointments POST] Error fetching user for email', err));
 
     return NextResponse.json({ success: true, appointment }, { status: 201 });
   } catch (err) {

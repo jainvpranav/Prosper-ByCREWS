@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { sendChatMessage } from '@/lib/chatService';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { useAuth } from '@/lib/auth-context';
 
 interface Message {
   id: string;
@@ -40,6 +41,7 @@ function TypingIndicator() {
 
 export function FloatingChat() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -84,7 +86,7 @@ export function FloatingChat() {
     setIsTyping(true);
 
     try {
-      const responseText = await sendChatMessage(text);
+      const responseText = await sendChatMessage(text, user?.userId);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: responseText,
