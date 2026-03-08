@@ -7,39 +7,39 @@ import { Shield, ShieldAlert, ShieldCheck, ShieldPlus, UserPlus, HeartPulse, Spa
 const SERVICE_CATALOG: Record<string, any> = {
   "Comprehensive Health Insurance": {
     icon: ShieldAlert, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20',
-    desc: 'Top-tier medical coverage including specialists and advanced care.', type: 'Insurance Plan', price: '₹249/mo'
+    desc: 'Top-tier medical coverage including specialists and advanced care.', type: 'Insurance Plan', price: '₹999/mo'
   },
   "Standard Health Insurance": {
     icon: ShieldCheck, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20',
-    desc: 'Solid baseline coverage for everyday health and wellness.', type: 'Insurance Plan', price: '₹129/mo'
+    desc: 'Solid baseline coverage for everyday health and wellness.', type: 'Insurance Plan', price: '₹1999/mo'
   },
   "Preventive Health Plan": {
     icon: Shield, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20',
-    desc: 'Focus on regular checkups, screenings, and staying healthy.', type: 'Insurance Plan', price: '₹49/mo'
+    desc: 'Focus on regular checkups, screenings, and staying healthy.', type: 'Insurance Plan', price: '₹2999/mo'
   },
   "High Coverage Life Insurance": {
     icon: UserPlus, color: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/20',
-    desc: 'Maximum financial protection for your family.', type: 'Life Insurance', price: '₹89/mo'
+    desc: 'Maximum financial protection for your family.', type: 'Life Insurance', price: '₹1999/mo'
   },
   "Standard Life Insurance": {
     icon: UserPlus, color: 'text-indigo-500', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20',
-    desc: 'Essential financial security policy.', type: 'Life Insurance', price: '₹35/mo'
+    desc: 'Essential financial security policy.', type: 'Life Insurance', price: '₹999/mo'
   },
   "Cardiovascular Screening": {
     icon: HeartPulse, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20',
-    desc: 'Comprehensive heart health check and lipid profiling.', type: 'Screening Module', price: 'Included'
+    desc: 'Comprehensive heart health check and lipid profiling.', type: 'Screening Module', price: '₹499/mo'
   },
   "Cancer Screening Package": {
     icon: Sparkles, color: 'text-fuchsia-500', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/20',
-    desc: 'Targeted oncology markers based on your profile.', type: 'Screening Module', price: 'Included'
+    desc: 'Targeted oncology markers based on your profile.', type: 'Screening Module', price: '₹999/mo'
   },
   "Weight Management Program": {
     icon: Activity, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20',
-    desc: 'Dietitian support and personalized fitness tracking.', type: 'Wellness Program', price: 'Free'
+    desc: 'Dietitian support and personalized fitness tracking.', type: 'Wellness Program', price: '₹1999/mo'
   },
   "Mental Wellness Program": {
     icon: Brain, color: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/20',
-    desc: 'Therapy access and stress management protocols.', type: 'Wellness Program', price: 'Free'
+    desc: 'Therapy access and stress management protocols.', type: 'Wellness Program', price: '₹1999/mo'
   }
 };
 
