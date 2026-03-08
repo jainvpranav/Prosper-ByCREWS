@@ -1,4 +1,4 @@
-export async function sendChatMessage(message: string) {
+export async function sendChatMessage(message: string, userId?: string) {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -6,7 +6,7 @@ export async function sendChatMessage(message: string) {
         'Content-Type': 'application/json',
       },
       // Lambda reads event.get("inputText"), so we send it under that key
-      body: JSON.stringify({ inputText: message }),
+      body: JSON.stringify({ inputText: message, userId }),
     });
 
     if (!response.ok) {

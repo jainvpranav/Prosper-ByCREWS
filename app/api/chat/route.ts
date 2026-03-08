@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log(enrichedBody, "This is the enriched body");
+
     const opts: aws4.Request = {
       host,
       path,
