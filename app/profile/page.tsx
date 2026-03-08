@@ -105,7 +105,6 @@ interface Answers {
 // Constants
 // ---------------------------------------------------------------------------
 const FIRST_QUESTION: QuestionId = 'Q1';
-const ML_API_BASE = process.env.NEXT_PUBLIC_RISK_API_BASE || 'http://localhost:8000';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -346,12 +345,12 @@ export default function ProfilePage() {
       };
 
       const [cardioRes, cancerRes] = await Promise.all([
-        fetch(`${ML_API_BASE}/predict`, {
+        fetch('/api/predict', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(cardioPayload),
         }),
-        fetch(`${ML_API_BASE}/cancer/all`, {
+        fetch('/api/cancer/all', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(cancerPayload),
@@ -457,7 +456,7 @@ export default function ProfilePage() {
         }
 
         // Derive missing assessment fields
-        const riskScore = Math.round((cardioData.risk_probability ?? 0) * 100);
+        const riskScore = Math.round((cardioData.risk_score ?? cardioData.risk_probability ?? 0) * 100);
         
         const hasAnyFamilyHistory = answers.family_history_breast || answers.family_history_ovarian || 
           answers.family_history_prostate || answers.family_history_skin || answers.family_history_blood || answers.family_history_brca2;
@@ -500,7 +499,7 @@ export default function ProfilePage() {
               ],
               projections,
               aiInsightSummary:
-                `Cardiovascular risk: ${cardioData.risk_category} (${riskScore}%). ` +
+                `Cardiovascular risk: ${cardioData.risk_band ?? cardioData.risk_category ?? 'Unknown'} (${riskScore}%). ` +
                 `Cancer assessments completed for ${(Array.isArray(cancerData) ? cancerData : []).map((c: any) => c.cancer_type).join(', ')}.`,
               cardioResult: cardioData,
               cancerResults: Array.isArray(cancerData) ? cancerData : [],

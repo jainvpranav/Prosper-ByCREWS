@@ -45,8 +45,10 @@ interface TopFactor {
 }
 
 interface CardioResult {
-  risk_probability: number;
-  risk_category: string;
+  risk_probability?: number;
+  risk_score?: number;
+  risk_category?: string;
+  risk_band?: string;
   at_risk: boolean;
   threshold_used: number;
   top_factors: TopFactor[];
@@ -80,7 +82,8 @@ function categoryBarColor(cat: string) {
   return 'from-green-500 to-emerald-400';
 }
 
-function cardioRiskColor(atRisk: boolean, category: string) {
+function cardioRiskColor(atRisk: boolean, category?: string) {
+  if (!category) return 'text-green-500';
   if (atRisk || category.toLowerCase() === 'high') return 'text-red-500';
   if (category.toLowerCase() === 'medium') return 'text-yellow-500';
   return 'text-green-500';
@@ -132,10 +135,12 @@ export default function DashboardPage() {
     csvRows.push(['Medical History', assessment.medicalHistoryRisk || 'N/A']);
     
     if (cardioResult) {
+      const prob = cardioResult.risk_probability ?? cardioResult.risk_score ?? 0;
+      const cat = cardioResult.risk_category ?? cardioResult.risk_band ?? 'Low';
       csvRows.push([]);
       csvRows.push(['Cardiovascular Risk']);
-      csvRows.push(['Probability', `${(cardioResult.risk_probability * 100).toFixed(1)}%`]);
-      csvRows.push(['Category', cardioResult.risk_category]);
+      csvRows.push(['Probability', `${(prob * 100).toFixed(1)}%`]);
+      csvRows.push(['Category', cat]);
       csvRows.push(['At Risk', cardioResult.at_risk ? 'Yes' : 'No']);
     }
 
@@ -291,8 +296,8 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 mb-6">
                 <Heart className="w-6 h-6 text-rose-500" />
                 <h2 className="text-xl font-bold">Cardiovascular Risk Assessment</h2>
-                <span className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold border ${categoryColor(cardioResult.risk_category)}`}>
-                  {cardioResult.risk_category} Risk
+                <span className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold border ${categoryColor(cardioResult.risk_category ?? cardioResult.risk_band ?? 'Low')}`}>
+                  {cardioResult.risk_category ?? cardioResult.risk_band ?? 'Low'} Risk
                 </span>
               </div>
 
@@ -300,10 +305,10 @@ export default function DashboardPage() {
                 {/* Risk Probability */}
                 <div className="flex flex-col items-center justify-center p-6 rounded-xl bg-muted/40 border border-border">
                   <p className="text-sm text-muted-foreground mb-1">Risk Probability</p>
-                  <p className={`text-4xl font-bold ${cardioRiskColor(cardioResult.at_risk, cardioResult.risk_category)}`}>
-                    {(cardioResult.risk_probability * 100).toFixed(1)}%
+                  <p className={`text-4xl font-bold ${cardioRiskColor(cardioResult.at_risk, cardioResult.risk_category ?? cardioResult.risk_band)}`}>
+                    {((cardioResult.risk_probability ?? cardioResult.risk_score ?? 0) * 100).toFixed(1)}%
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Threshold: {(cardioResult.threshold_used * 100).toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground mt-1">Threshold: {((cardioResult.threshold_used ?? 0) * 100).toFixed(1)}%</p>
                 </div>
 
                 {/* At Risk */}
