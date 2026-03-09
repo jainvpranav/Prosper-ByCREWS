@@ -12,12 +12,6 @@ export function Navbar() {
   const pathname = usePathname();
   const { user, logout, loading } = useAuth();
 
-  const isAppRoute = pathname.startsWith('/dashboard') || 
-                     pathname.startsWith('/health-plan') ||
-                     pathname.startsWith('/appointments') || 
-                     pathname.startsWith('/risk-assessment') ||
-                     pathname.startsWith('/profile');
-
   const publicLinks = [
     { href: '/', label: 'Home' },
     { href: '/features', label: 'Features' },
@@ -32,7 +26,8 @@ export function Navbar() {
     { href: '/profile', label: 'My Profile' },
   ];
 
-  const links = isAppRoute ? appLinks : publicLinks;
+  // Show app links if user is logged in, public links otherwise
+  const links = user ? appLinks : publicLinks;
 
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -67,7 +62,7 @@ export function Navbar() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
 
-            {!loading && !user && !isAppRoute && (
+            {!loading && !user && (
               <div className="hidden md:flex gap-3">
                 <Link
                   href="/login"

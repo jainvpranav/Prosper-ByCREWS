@@ -58,10 +58,80 @@ export default function AppointmentsPage() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [searchingLocation, setSearchingLocation] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
+
+  // Shared function to fetch hospitals from Overpass API
+  const fetchHospitalsAtLocation = async (lat: number, lng: number) => {
+    try {
+      const query = `
+        [out:json];
+        (
+          node["amenity"="hospital"](around:5000, ${lat}, ${lng});
+          node["amenity"="clinic"](around:5000, ${lat}, ${lng});
+        );
+        out body;
+      `;
+      const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Network response was not ok');
+      const data = await res.json();
+      const fetchedHospitals = data.elements.filter((el: any) => el.tags && el.tags.name).map((el: any) => ({
+        id: el.id,
+        lat: el.lat,
+        lon: el.lon,
+        tags: el.tags,
+        name: el.tags?.name || 'Unnamed Healthcare Facility',
+        distance: 'Nearby',
+        rating: (4.0 + Math.random()).toFixed(1),
+        image: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e2e8f0'/><path d='M200 120 l0 60 M170 150 l60 0' stroke='%2394a3b8' stroke-width='20' stroke-linecap='square'/></svg>",
+      }));
+
+      if (fetchedHospitals.length > 0) {
+        const topHospitals = fetchedHospitals.slice(0, 10);
+        setLocations(topHospitals);
+        setSelectedLocation(topHospitals[0]);
+      } else {
+        setLocationError('No hospitals found in this area.');
+        setLocations([]);
+      }
+    } catch (err) {
+      console.error('[Hospital Fetch Error]', err);
+      setLocationError('Failed to fetch hospitals.');
+    }
+  };
+
+  // Search by city/address using Nominatim
+  const handleLocationSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locationQuery.trim()) return;
+    setSearchingLocation(true);
+    setLocationError(null);
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationQuery)}&limit=1`,
+        { headers: { 'User-Agent': 'ProsperHealth/1.0' } }
+      );
+      const results = await res.json();
+      if (results.length === 0) {
+        setLocationError(`Could not find "${locationQuery}". Try a different search.`);
+        return;
+      }
+      const { lat, lon } = results[0];
+      const coords: [number, number] = [parseFloat(lat), parseFloat(lon)];
+      setUserLocation(coords);
+      await fetchHospitalsAtLocation(coords[0], coords[1]);
+    } catch (err) {
+      console.error('[Nominatim Error]', err);
+      setLocationError('Location search failed. Please try again.');
+    } finally {
+      setSearchingLocation(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -81,10 +151,10 @@ export default function AppointmentsPage() {
     loadAppointments();
   }, [user]);
 
-  // Fetch Hospitals via Geolocation
+  // Fetch Hospitals via Geolocation on initial load
   useEffect(() => {
     if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by your browser");
+      setLocationError("Geolocation is not supported by your browser. Use the search to find hospitals.");
       return;
     }
 
@@ -93,51 +163,17 @@ export default function AppointmentsPage() {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserLocation([latitude, longitude]);
-        
-        try {
-          const query = `
-            [out:json];
-            (
-              node["amenity"="hospital"](around:5000, ${latitude}, ${longitude});
-              node["amenity"="clinic"](around:5000, ${latitude}, ${longitude});
-            );
-            out body;
-          `;
-          const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-          if (!res.ok) throw new Error('Network response was not ok');
-          const data = await res.json();
-          const fetchedHospitals = data.elements.filter((el: any) => el.tags && el.tags.name).map((el: any) => ({
-            id: el.id,
-            lat: el.lat,
-            lon: el.lon,
-            tags: el.tags,
-            name: el.tags?.name || 'Unnamed Healthcare Facility',
-            distance: 'Nearby', 
-            rating: (4.0 + Math.random()).toFixed(1), // Mock rating
-            image: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e2e8f0'/><path d='M200 120 l0 60 M170 150 l60 0' stroke='%2394a3b8' stroke-width='20' stroke-linecap='square'/></svg>",
-          }));
-
-          if (fetchedHospitals.length > 0) {
-            const topHospitals = fetchedHospitals.slice(0, 10);
-            setLocations(topHospitals);
-            setSelectedLocation(topHospitals[0]);
-          } else {
-            setLocationError("No hospitals found nearby.");
-          }
-        } catch (err) {
-          console.error('[Map Fetch Error]', err);
-          setLocationError("Failed to fetch nearby hospitals.");
-        } finally {
-          setLoadingLocation(false);
-        }
+        await fetchHospitalsAtLocation(latitude, longitude);
+        setLoadingLocation(false);
       },
       (err) => {
         console.error('[Geolocation Error]', err);
-        setLocationError("Unable to retrieve your location. Using fallback locations.");
+        setLocationError("Unable to retrieve your location. Use the search bar to find hospitals.");
         setLoadingLocation(false);
       },
       { timeout: 10000 }
     );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getDaysInMonth = (date: Date) =>
@@ -280,7 +316,28 @@ export default function AppointmentsPage() {
             </div>
           )}
 
-          {/* Map Display */}
+          {/* Location Search + Map Display */}
+          <form onSubmit={handleLocationSearch} className="mb-4 flex gap-3">
+            <div className="relative flex-1">
+              <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+                placeholder="Search by city or address (e.g. 'Mumbai' or 'Koramangala, Bengaluru')"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-input focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={searchingLocation || !locationQuery.trim()}
+              className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+            >
+              {searchingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Search
+            </button>
+          </form>
+
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
             <div className="lg:col-span-4 h-[400px] border border-border rounded-2xl overflow-hidden shadow-sm relative z-0">
                {userLocation ? (

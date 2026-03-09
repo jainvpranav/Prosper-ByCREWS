@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar";
+import { AssessmentCTA } from "@/components/AssessmentCTA";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -31,9 +32,9 @@ export default function Home() {
               </div>
 
               <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
-                <span className="text-foreground">Your health, </span>
+                <span className="text-foreground">Your Health, </span>
                 <span className="bg-gradient-to-r from-primary to-rose-400 bg-clip-text text-transparent">
-                  Deserve
+                  Reimagined
                 </span>
               </h1>
 
@@ -258,23 +259,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="px-4 sm:px-6 lg:px-8 py-20 md:py-32 bg-gradient-to-r from-primary to-rose-400 text-white">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Transform Your Health?
-          </h2>
-          <p className="text-lg mb-8 opacity-90">
-            Join thousands of people taking control of their health with PROSPER
-          </p>
-          <Link
-            href="/profile"
-            className="inline-block px-8 py-4 rounded-xl bg-white text-primary font-semibold hover:opacity-90 transition-opacity"
-          >
-            Start Your Free Assessment
-          </Link>
-        </div>
-      </section>
+      {/* CTA Section — login-aware */}
+      <AssessmentCTA />
 
       {/* Footer */}
       <footer className="bg-muted border-t border-border px-4 sm:px-6 lg:px-8 py-12">

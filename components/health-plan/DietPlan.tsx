@@ -6,33 +6,45 @@ type DietPlanProps = {
   cholesterol: number;
   glucose: number;
   bmi: number;
+  aiData?: any;
 };
 
-export function DietPlan({ cholesterol, glucose, bmi }: DietPlanProps) {
+export function DietPlan({ cholesterol, glucose, bmi, aiData }: DietPlanProps) {
   // Simple heuristic logic based on PRD
   const isHighCholesterol = cholesterol > 200;
   const isHighGlucose = glucose > 100;
   const needsWeightLoss = bmi > 25;
 
-  const toAvoid = [];
-  const toEncourage = ['Leafy greens', 'Lean proteins (chicken, fish)', 'High-fiber legumes'];
-  
-  if (isHighCholesterol) {
-    toAvoid.push('Fried foods', 'Red meat', 'Full-fat dairy');
-    toEncourage.push('Oats and barley', 'Nuts', 'Olive oil');
-  }
-  
-  if (isHighGlucose) {
-    toAvoid.push('Sugary drinks', 'White bread/rice', 'Pastries');
-    toEncourage.push('Whole grains', 'Non-starchy vegetables');
-  }
+  let toAvoid = [];
+  let toEncourage = ['Leafy greens', 'Lean proteins (chicken, fish)', 'High-fiber legumes'];
+  let sodiumTarget = isHighCholesterol ? '< 1,500 mg' : '< 2,300 mg';
+  let calorieTarget = needsWeightLoss ? 'Moderate Deficit' : 'Maintenance';
+  let focusText = `Based on your ${isHighCholesterol ? 'cholesterol' : ''}${isHighCholesterol && isHighGlucose ? ' and ' : ''}${isHighGlucose ? 'glucose levels' : (isHighCholesterol ? 'levels' : 'profile')}.`;
 
-  if (needsWeightLoss) {
-    toAvoid.push('Processed snacks', 'Excessive calories');
-  }
+  if (aiData) {
+    toAvoid = aiData.foodsToLimit || [];
+    toEncourage = aiData.foodsToEncourage || [];
+    sodiumTarget = aiData.sodiumTarget || sodiumTarget;
+    calorieTarget = aiData.calorieTarget || calorieTarget;
+    focusText = aiData.focus || focusText;
+  } else {
+    if (isHighCholesterol) {
+      toAvoid.push('Fried foods', 'Red meat', 'Full-fat dairy');
+      toEncourage.push('Oats and barley', 'Nuts', 'Olive oil');
+    }
+    
+    if (isHighGlucose) {
+      toAvoid.push('Sugary drinks', 'White bread/rice', 'Pastries');
+      toEncourage.push('Whole grains', 'Non-starchy vegetables');
+    }
 
-  if (toAvoid.length === 0) {
-    toAvoid.push('Excessive processed foods', 'Late night heavy meals');
+    if (needsWeightLoss) {
+      toAvoid.push('Processed snacks', 'Excessive calories');
+    }
+
+    if (toAvoid.length === 0) {
+      toAvoid.push('Excessive processed foods', 'Late night heavy meals');
+    }
   }
 
   return (
@@ -45,9 +57,7 @@ export function DietPlan({ cholesterol, glucose, bmi }: DietPlanProps) {
       </div>
       
       <p className="text-sm text-muted-foreground mb-6">
-        Based on your {isHighCholesterol ? 'cholesterol' : ''} 
-        {isHighCholesterol && isHighGlucose ? ' and ' : ''} 
-        {isHighGlucose ? 'glucose levels' : (isHighCholesterol ? 'levels' : 'profile')}.
+        {focusText}
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -56,7 +66,7 @@ export function DietPlan({ cholesterol, glucose, bmi }: DietPlanProps) {
             <Check className="w-4 h-4 text-green-500" /> Foods to Encourage
           </h4>
           <ul className="space-y-2">
-            {toEncourage.map((food, i) => (
+            {toEncourage.map((food: string, i: number) => (
               <li key={i} className="text-sm text-foreground/80 flex items-start gap-2">
                 <span className="text-green-500 mt-1">•</span> {food}
               </li>
@@ -69,7 +79,7 @@ export function DietPlan({ cholesterol, glucose, bmi }: DietPlanProps) {
             <X className="w-4 h-4 text-rose-500" /> Foods to Limit
           </h4>
           <ul className="space-y-2">
-            {toAvoid.map((food, i) => (
+            {toAvoid.map((food: string, i: number) => (
               <li key={i} className="text-sm text-foreground/80 flex items-start gap-2">
                 <span className="text-rose-500 mt-1">•</span> {food}
               </li>
@@ -81,11 +91,11 @@ export function DietPlan({ cholesterol, glucose, bmi }: DietPlanProps) {
       <div className="mt-6 pt-6 border-t border-border flex justify-between text-sm">
         <div>
           <span className="block text-muted-foreground text-xs">Daily Sodium Target</span>
-          <span className="font-semibold">{isHighCholesterol ? '< 1,500 mg' : '< 2,300 mg'}</span>
+          <span className="font-semibold">{sodiumTarget}</span>
         </div>
         <div className="text-right">
           <span className="block text-muted-foreground text-xs">Daily Calorie Target</span>
-          <span className="font-semibold">{needsWeightLoss ? 'Moderate Deficit' : 'Maintenance'}</span>
+          <span className="font-semibold">{calorieTarget}</span>
         </div>
       </div>
     </div>

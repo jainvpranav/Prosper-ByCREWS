@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { Loader2, Sparkles, Brain } from 'lucide-react';
+import { Loader2, Sparkles, Brain, RefreshCcw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { SmokingPlan } from './SmokingPlan';
 import { DrinkingPlan } from './DrinkingPlan';
 import { DietPlan } from './DietPlan';
@@ -16,7 +17,7 @@ export function HealthPlanCards() {
   
   // Bedrock AI specific
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiPlan, setAiPlan] = useState<string | null>(null);
+  const [aiPlan, setAiPlan] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -98,9 +99,19 @@ export function HealthPlanCards() {
           </div>
         </div>
         
-        {aiPlan ? (
-          <div className="prose dark:prose-invert max-w-none text-sm p-6 bg-background rounded-xl border border-border">
-            {aiPlan}
+        {aiPlan?.aiPlan ? (
+          <div className="space-y-4">
+            <div className="prose dark:prose-invert max-w-none text-sm p-6 bg-background rounded-xl border border-border [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1 [&_strong]:text-foreground">
+              <ReactMarkdown>{aiPlan.aiPlan}</ReactMarkdown>
+            </div>
+            <button
+              onClick={generateAIPlan}
+              disabled={aiLoading}
+              className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+            >
+              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+              Regenerate Plan
+            </button>
           </div>
         ) : (
           <button 
@@ -119,12 +130,14 @@ export function HealthPlanCards() {
           cholesterol={data.profile.cholesterol ?? 150} 
           glucose={data.profile.glucose ?? 90} 
           bmi={data.profile.bmi ?? 22} 
+          aiData={aiPlan?.diet}
         />
         
         <ExercisePlan 
           restingHr={data.profile.restingHr ?? 70} 
           riskBand={riskBand} 
           bmi={data.profile.bmi ?? 22} 
+          aiData={aiPlan?.exercise}
         />
 
         <MedicationPlan 
