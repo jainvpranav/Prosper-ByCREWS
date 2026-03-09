@@ -697,10 +697,10 @@ export default function DashboardPage() {
             <h3 className="text-2xl font-bold mb-2">Ready for Your Personalized Care Plan?</h3>
             <p className="text-muted-foreground mb-6">Get detailed recommendations tailored to your health profile</p>
             <Link
-              href="/appointments"
+              href="/health-plan"
               className="inline-block px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
             >
-              Book an Appointment
+              View My Health Plan
             </Link>
           </div>
 
